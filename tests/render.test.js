@@ -39,6 +39,32 @@ test('background "breathe" modulates by sin(t*0.6)', () => {
 });
 
 import { renderFireZone } from '../src/render.js';
+import { renderEntity } from '../src/render.js';
+
+test('entity at integer virtual position lights one LED fully', () => {
+  const ledCount = 100;
+  const f = newFrame(ledCount);
+  renderEntity(f, 100.0, [255, 0, 0], ledCount, false, 0, {});
+  assert.equal(f[10*3 + 0], 255);
+  assert.equal(f[9*3 + 0], 0);
+  assert.equal(f[11*3 + 0], 0);
+});
+
+test('entity at fractional position splits between two LEDs', () => {
+  const ledCount = 100;
+  const f = newFrame(ledCount);
+  renderEntity(f, 105.0, [200, 0, 0], ledCount, false, 0, {});
+  assert.equal(f[10*3 + 0], Math.floor(200 * 0.5));
+  assert.equal(f[11*3 + 0], Math.floor(200 * 0.5));
+});
+
+test('entity overwrites prior framebuffer value', () => {
+  const ledCount = 10;
+  const f = newFrame(ledCount);
+  f[5*3 + 0] = 50;
+  renderEntity(f, 500.0, [200, 0, 0], ledCount, false, 0, {});
+  assert.equal(f[5*3 + 0], 200);
+});
 
 test('fire zone writes non-zero R into last fireZoneLeds positions', () => {
   const ledCount = 20, fireZone = 4;
