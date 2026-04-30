@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { newFrame, renderBackground } from '../src/render.js';
+import { newFrame, renderBackground, applyBrightness, renderFrame } from '../src/render.js';
 
 test('newFrame allocates Uint8Array of ledCount*3 zeros', () => {
   const f = newFrame(60);
@@ -89,4 +89,60 @@ test('fire zone palette: R >= G >= B per LED', () => {
     assert.ok(r >= g, `R(${r}) >= G(${g}) at led ${i}`);
     assert.ok(g >= b, `G(${g}) >= B(${b}) at led ${i}`);
   }
+});
+
+test('applyBrightness scales every byte by value/100', () => {
+  const f = new Uint8Array([100, 200, 50, 0, 255, 128]);
+  applyBrightness(f, 50);
+  assert.equal(f[0], 50);
+  assert.equal(f[1], 100);
+  assert.equal(f[2], 25);
+  assert.equal(f[3], 0);
+  assert.equal(f[4], 127);
+  assert.equal(f[5], 64);
+});
+
+test('renderFrame end-to-end: idle scene, no entities, off bg', () => {
+  const cfg = {
+    fireZoneLeds: 4,
+    render: {
+      backgroundBrightness: 0.15,
+      leadEmphasisBaseW: 0.15, leadEmphasisAmpW: 0.10,
+      leadEmphasisHzAtSpawn: 1.5, leadEmphasisHzAtFire: 6.0,
+    },
+  };
+  const out = renderFrame({
+    ledCount: 10, t: 0,
+    background: { mode: 'off' },
+    entities: [],
+    leadId: null,
+    brightness: 100,
+    cfg,
+  });
+  assert.equal(out.length, 30);
+  for (let i = 0; i < 6; i++) {
+    assert.equal(out[i*3 + 0], 0);
+    assert.equal(out[i*3 + 1], 0);
+    assert.equal(out[i*3 + 2], 0);
+  }
+});
+
+test('renderFrame end-to-end: one entity painted, brightness 50% halves it', () => {
+  const cfg = {
+    fireZoneLeds: 4,
+    render: {
+      backgroundBrightness: 0.15,
+      leadEmphasisBaseW: 0.15, leadEmphasisAmpW: 0.10,
+      leadEmphasisHzAtSpawn: 1.5, leadEmphasisHzAtFire: 6.0,
+    },
+  };
+  const out = renderFrame({
+    ledCount: 100, t: 0,
+    background: { mode: 'off' },
+    entities: [{ id: 1, pos: 100, color: 'R' }],
+    leadId: null,
+    brightness: 50,
+    cfg,
+  });
+  assert.equal(out[10*3 + 0], 127);
 });

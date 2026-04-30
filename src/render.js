@@ -1,4 +1,4 @@
-import { parseHex } from './color.js';
+import { parseHex, baseColor } from './color.js';
 
 export function newFrame(ledCount) {
   return new Uint8Array(ledCount * 3);
@@ -69,4 +69,24 @@ export function renderFireZone(frame, ledCount, fireZoneLeds, t) {
     frame[i*3 + 1] = Math.min(255, Math.floor(180 * h2));
     frame[i*3 + 2] = Math.min(255, Math.floor(40 * h3));
   }
+}
+
+export function applyBrightness(frame, value0to100) {
+  const k = value0to100 / 100;
+  for (let i = 0; i < frame.length; i++) {
+    frame[i] = Math.floor(frame[i] * k);
+  }
+}
+
+export function renderFrame({ ledCount, t, background, entities, leadId, brightness, cfg }) {
+  const frame = newFrame(ledCount);
+  const fireZoneLeds = cfg.fireZoneLeds;
+  renderBackground(frame, background, ledCount, fireZoneLeds, t, cfg.render);
+  renderFireZone(frame, ledCount, fireZoneLeds, t);
+  for (const e of entities) {
+    const rgb = baseColor(e.color);
+    renderEntity(frame, e.pos, rgb, ledCount, e.id === leadId, t, cfg.render);
+  }
+  applyBrightness(frame, brightness);
+  return frame;
 }
