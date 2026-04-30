@@ -1,0 +1,22 @@
+[Unit]
+Description=WLED Game bridge service
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=wledgame
+WorkingDirectory=/opt/wledgame
+ExecStart=/usr/bin/node /opt/wledgame/server.js
+Restart=on-failure
+RestartSec=3
+StandardOutput=journal
+StandardError=journal
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/wledgame
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
