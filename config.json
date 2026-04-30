@@ -1,0 +1,29 @@
+{
+  "httpPort": 8080,
+  "httpPortMaxWalk": 8090,
+  "logLevel": "info",
+  "fireZoneLeds": 4,
+  "targetFps": 30,
+  "stateDir": "/var/lib/wledgame",
+  "game": {
+    "spawnBaseMs": 1800,
+    "spawnEvery": 5,
+    "spawnStepMs": 60,
+    "spawnMinMs": 500,
+    "speedBaseUnitsPerSec": 70,
+    "speedEvery": 15,
+    "speedFactor": 1.05,
+    "speedMaxUnitsPerSec": 220,
+    "shotSpeedUnitsPerSec": 700,
+    "kidsSpawnMul": 1.8,
+    "kidsSpeedMul": 0.5,
+    "gameOverCooldownMs": 5000
+  },
+  "render": {
+    "backgroundBrightness": 0.15,
+    "leadEmphasisBaseW": 0.15,
+    "leadEmphasisAmpW": 0.10,
+    "leadEmphasisHzAtSpawn": 1.5,
+    "leadEmphasisHzAtFire": 6.0
+  }
+}

@@ -1,0 +1,7 @@
+{
+  "_comment": "Copy this file to wleds.json and replace the IPs with your own. wleds.json is gitignored.",
+  "wleds": [
+    { "host": "10.0.0.10", "name": "Living room strip" },
+    { "host": "10.0.0.11", "name": "Hallway strip" }
+  ]
+}
