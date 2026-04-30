@@ -26,6 +26,7 @@ async function main() {
   const runner = createGameRunner({
     cfg, wledStore, sender,
     broadcast: (msg) => wsLayer?.broadcast(msg),
+    broadcastFrame: (rgb) => wsLayer?.broadcastFrame(rgb),
   });
 
   const handler = createHttpHandler({

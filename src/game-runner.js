@@ -8,7 +8,7 @@ import { log } from './log.js';
 
 const COLORS = ['R', 'G', 'B'];
 
-export function createGameRunner({ cfg, wledStore, sender, broadcast }) {
+export function createGameRunner({ cfg, wledStore, sender, broadcast, broadcastFrame = () => {} }) {
   let gs = null;
   let activeWled = null;
   let loopTimer = null;
@@ -122,6 +122,7 @@ export function createGameRunner({ cfg, wledStore, sender, broadcast }) {
         log.warn('udp send failed', { error: String(err.message || err) });
       });
     }
+    broadcastFrame(frame);
   }
 
   function stateMessage() {

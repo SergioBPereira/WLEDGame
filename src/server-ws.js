@@ -1,4 +1,5 @@
 import { WebSocketServer } from 'ws';
+import { Buffer } from 'node:buffer';
 import { parseClientMessage } from './protocol.js';
 import { log } from './log.js';
 
@@ -23,8 +24,23 @@ export function createWsLayer({ httpServer, runner, wledStore }) {
     };
   }
 
+  function broadcastFrame(rgbBuf) {
+    if (!rgbBuf) return;
+    let cached = null;
+    for (const c of clients) {
+      if (c.readyState === 1 && c.wantsPreview) {
+        if (cached === null) {
+          const b64 = Buffer.from(rgbBuf.buffer, rgbBuf.byteOffset, rgbBuf.byteLength).toString('base64');
+          cached = JSON.stringify({ type: 'frame', rgb: b64, n: rgbBuf.length / 3 });
+        }
+        c.send(cached);
+      }
+    }
+  }
+
   wss.on('connection', (ws) => {
     clients.add(ws);
+    ws.wantsPreview = false;
     ws.send(JSON.stringify(helloFor()));
     ws.send(JSON.stringify(runner.snapshot()));
 
@@ -49,6 +65,8 @@ export function createWsLayer({ httpServer, runner, wledStore }) {
           }
         } else if (m.type === 'hello') {
           ws.send(JSON.stringify(helloFor()));
+        } else if (m.type === 'preview') {
+          ws.wantsPreview = m.enabled;
         }
       } catch (e) {
         log.error('ws handler error', { error: String(e.message || e) });
@@ -60,5 +78,5 @@ export function createWsLayer({ httpServer, runner, wledStore }) {
     ws.on('error', () => clients.delete(ws));
   });
 
-  return { broadcast, helloFor };
+  return { broadcast, broadcastFrame, helloFor };
 }

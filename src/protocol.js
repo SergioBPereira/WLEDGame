@@ -34,6 +34,9 @@ export function parseClientMessage(raw) {
       }
       return { type: 'start', wledId: m.wledId, wrongColorMode: m.wrongColorMode, kidsMode, background: bg };
     }
+    case 'preview': {
+      return { type: 'preview', enabled: !!m.enabled };
+    }
     default:
       bad(`unknown type ${m.type}`);
   }

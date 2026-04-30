@@ -55,3 +55,16 @@ test('rejects unknown type', () => {
 test('rejects malformed json', () => {
   assert.throws(() => parseClientMessage('{not json'));
 });
+
+test('parses preview enabled true', () => {
+  const m = parseClientMessage(JSON.stringify({ type: 'preview', enabled: true }));
+  assert.equal(m.type, 'preview');
+  assert.equal(m.enabled, true);
+});
+
+test('parses preview enabled false (and coerces missing to false)', () => {
+  const m1 = parseClientMessage(JSON.stringify({ type: 'preview', enabled: false }));
+  assert.equal(m1.enabled, false);
+  const m2 = parseClientMessage(JSON.stringify({ type: 'preview' }));
+  assert.equal(m2.enabled, false);
+});
