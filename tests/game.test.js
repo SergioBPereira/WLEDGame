@@ -37,3 +37,38 @@ test('makeIdGen produces unique increasing ids', () => {
   assert.equal(gen(), 2);
   assert.equal(gen(), 3);
 });
+
+import { createGameState, spawnEnemy, advanceEntities } from '../src/game.js';
+
+test('createGameState yields idle phase, empty entities', () => {
+  const gs = createGameState({ ledCount: 60, fireZoneLeds: 4 });
+  assert.equal(gs.phase, 'idle');
+  assert.equal(gs.score, 0);
+  assert.deepEqual(gs.clusters, []);
+  assert.deepEqual(gs.shots, []);
+  assert.equal(gs.fireZoneVirtualSize > 0, true);
+});
+
+test('spawnEnemy creates a cluster at pos 0 with one R/G/B color', () => {
+  const gs = createGameState({ ledCount: 60, fireZoneLeds: 4 });
+  spawnEnemy(gs, 'R');
+  assert.equal(gs.clusters.length, 1);
+  const c = gs.clusters[0];
+  assert.equal(c.colors.length, 1);
+  assert.equal(c.colors[0], 'R');
+  assert.equal(c.pos, 0);
+});
+
+test('advanceEntities moves clusters by speed*dtSec', () => {
+  const gs = createGameState({ ledCount: 60, fireZoneLeds: 4 });
+  spawnEnemy(gs, 'G');
+  advanceEntities(gs, 1.0, 100, 700);
+  assert.equal(gs.clusters[0].pos, 100);
+});
+
+test('advanceEntities removes shots that reach pos 0', () => {
+  const gs = createGameState({ ledCount: 60, fireZoneLeds: 4 });
+  gs.shots.push({ id: 1, pos: 50, color: 'R' });
+  advanceEntities(gs, 1.0, 70, 700);
+  assert.equal(gs.shots.length, 0);
+});
