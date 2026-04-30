@@ -37,3 +37,30 @@ test('background "breathe" modulates by sin(t*0.6)', () => {
     assert.equal(f[i*3 + 1], expected);
   }
 });
+
+import { renderFireZone } from '../src/render.js';
+
+test('fire zone writes non-zero R into last fireZoneLeds positions', () => {
+  const ledCount = 20, fireZone = 4;
+  const f = newFrame(ledCount);
+  renderFireZone(f, ledCount, fireZone, 1.234);
+  for (let i = 0; i < ledCount - fireZone; i++) {
+    assert.equal(f[i*3 + 0], 0);
+  }
+  let anyR = false;
+  for (let i = ledCount - fireZone; i < ledCount; i++) {
+    if (f[i*3 + 0] > 0) anyR = true;
+  }
+  assert.ok(anyR);
+});
+
+test('fire zone palette: R >= G >= B per LED', () => {
+  const ledCount = 10, fireZone = 4;
+  const f = newFrame(ledCount);
+  renderFireZone(f, ledCount, fireZone, 0.5);
+  for (let i = ledCount - fireZone; i < ledCount; i++) {
+    const [r, g, b] = [f[i*3], f[i*3+1], f[i*3+2]];
+    assert.ok(r >= g, `R(${r}) >= G(${g}) at led ${i}`);
+    assert.ok(g >= b, `G(${g}) >= B(${b}) at led ${i}`);
+  }
+});
