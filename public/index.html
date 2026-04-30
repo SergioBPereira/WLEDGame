@@ -1,1 +1,314 @@
-<!doctype html><html><body>WLEDGame placeholder</body></html>
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+  <title>WLED Game</title>
+  <style>
+    :root { color-scheme: dark; }
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    html, body { margin: 0; height: 100%; background: #000; color: #eee;
+                  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+    body { display: flex; flex-direction: column; overflow: hidden; }
+    .screen { flex: 1; display: none; flex-direction: column; padding: 16px; gap: 16px; }
+    .screen.active { display: flex; }
+    h1 { font-size: 2rem; margin: 0; }
+    .row { display: flex; gap: 12px; align-items: center; }
+    select, input[type=color] { background: #222; color: #eee; border: 1px solid #444;
+        padding: 10px; font-size: 1rem; border-radius: 6px; }
+    button { background: #335; color: #eee; border: 0; padding: 14px 18px;
+        font-size: 1.05rem; border-radius: 8px; cursor: pointer; }
+    button:active { transform: scale(0.97); }
+    button[disabled] { opacity: 0.4; cursor: not-allowed; }
+    .start-btn { font-size: 1.4rem; padding: 18px; background: #2a7; }
+    .top { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+    .score { font-size: 2.4rem; font-weight: 700; }
+    .conn { width: 14px; height: 14px; border-radius: 50%; background: #2a7; }
+    .conn.reconnecting { background: orange; animation: pulse 1s infinite; }
+    @keyframes pulse { 50% { opacity: 0.4; } }
+    .bri { flex: 1; max-width: 220px; display: flex; align-items: center; gap: 8px; }
+    .bri input { flex: 1; }
+    .pad { flex: 1; display: flex; gap: 8px; }
+    .btn-color { flex: 1; border-radius: 14px; transition: filter 100ms, transform 100ms; }
+    .btn-color:active { filter: brightness(0.7); transform: scale(0.95); }
+    .btn-R { background: #d22; } .btn-G { background: #2c4; } .btn-B { background: #36e; }
+    .btn-color.flash { animation: flash 200ms; }
+    .btn-color.flash-bad { animation: flash-bad 250ms; }
+    @keyframes flash { 0% { filter: brightness(2.0); } 100% { filter: none; } }
+    @keyframes flash-bad { 0%, 100% { box-shadow: 0 0 0 0 #f44; } 50% { box-shadow: 0 0 0 6px #f44; } }
+    .picker { display: flex; gap: 6px; }
+    .picker button { flex: 1; }
+    .picker button.selected { outline: 2px solid #fff; }
+    .swatches { display: grid; grid-template-columns: repeat(8, 1fr); gap: 6px; margin-top: 6px; }
+    .swatch { aspect-ratio: 1/1; border-radius: 6px; cursor: pointer; border: 2px solid transparent; }
+    .swatch.selected { border-color: #fff; }
+    .over h1 { font-size: 3rem; }
+    .over .score-big { font-size: 4rem; font-weight: 700; }
+  </style>
+</head>
+<body>
+
+  <div id="screen-start" class="screen active">
+    <h1>WLED Game</h1>
+    <div>Acerta nas luzes com a cor certa antes que cheguem ao fogo.</div>
+
+    <div class="row"><label style="flex:0 0 6em">WLED</label>
+      <select id="wled-select" style="flex:1"></select></div>
+
+    <div class="row"><label style="flex:0 0 6em">Mode</label>
+      <div class="picker" style="flex:1">
+        <button data-mode="consumed" class="selected">Consumed</button>
+        <button data-mode="stuck">Stuck at front</button>
+      </div></div>
+
+    <div class="row"><label style="flex:0 0 6em">Kids mode</label>
+      <div class="picker" style="flex:1">
+        <button data-kids="false" class="selected">No</button>
+        <button data-kids="true">Yes</button>
+      </div></div>
+
+    <div>
+      <div class="row"><label style="flex:0 0 6em">Background</label>
+        <div class="picker" style="flex:1">
+          <button data-bg="off" class="selected">Off</button>
+          <button data-bg="solid">Solid</button>
+          <button data-bg="breathe">Breathe</button>
+        </div></div>
+      <div id="bg-color-row" style="display:none; margin-top: 8px;">
+        <div class="swatches" id="swatches"></div>
+        <input type="color" id="custom-color" value="#3344ff" style="margin-top:6px; width:100%; height:40px;">
+      </div>
+    </div>
+
+    <div style="flex:1"></div>
+    <button id="start-btn" class="start-btn">COMEÇAR</button>
+  </div>
+
+  <div id="screen-game" class="screen">
+    <div class="top">
+      <div class="score" id="score">0</div>
+      <div class="bri">
+        <span style="font-size:0.85rem">☼</span>
+        <input id="brightness" type="range" min="10" max="100" value="70">
+        <span id="bri-val" style="font-size:0.85rem; min-width:2.5em; text-align:right">70%</span>
+      </div>
+      <div class="conn" id="conn"></div>
+    </div>
+    <div style="flex:1"></div>
+    <div class="pad">
+      <button class="btn-color btn-R" data-color="R"></button>
+      <button class="btn-color btn-G" data-color="G"></button>
+      <button class="btn-color btn-B" data-color="B"></button>
+    </div>
+  </div>
+
+  <div id="screen-over" class="screen over">
+    <h1>GAME OVER</h1>
+    <div>Score</div>
+    <div class="score-big" id="final-score">0</div>
+    <div style="flex:1"></div>
+    <button id="again-btn" class="start-btn">Jogar outra vez</button>
+  </div>
+
+  <script>
+  const SWATCHES = ['#ffd29e','#1a3a8c','#8c1a1a','#ff9a1a','#1a8c8c','#a020a0','#5020a0','#444444'];
+
+  const state = {
+    wleds: [], wledId: null,
+    wrongColorMode: 'consumed', kidsMode: false,
+    background: { mode: 'off', color: SWATCHES[1] },
+    brightness: Number(localStorage.getItem('wledgame.brightness') || 70),
+    cooldownEndTs: 0,
+    ws: null, reconnectAttempt: 0,
+  };
+
+  try {
+    const saved = JSON.parse(localStorage.getItem('wledgame.background') || 'null');
+    if (saved && saved.mode) state.background = saved;
+  } catch (_) {}
+
+  function $(sel) { return document.querySelector(sel); }
+  function $$(sel) { return [...document.querySelectorAll(sel)]; }
+  function show(id) {
+    $$('.screen').forEach(s => s.classList.remove('active'));
+    $('#' + id).classList.add('active');
+  }
+
+  function bindPicker(selector, fn) {
+    $$(selector).forEach(btn => {
+      btn.addEventListener('click', () => {
+        $$(selector).forEach(b => b.classList.remove('selected'));
+        btn.classList.add('selected');
+        fn(btn);
+      });
+    });
+  }
+
+  bindPicker('.picker [data-mode]', b => state.wrongColorMode = b.dataset.mode);
+  bindPicker('.picker [data-kids]', b => state.kidsMode = b.dataset.kids === 'true');
+  bindPicker('.picker [data-bg]', b => {
+    state.background.mode = b.dataset.bg;
+    $('#bg-color-row').style.display = b.dataset.bg === 'off' ? 'none' : '';
+    persistBg();
+  });
+
+  const swatchesEl = $('#swatches');
+  SWATCHES.forEach((c) => {
+    const d = document.createElement('div');
+    d.className = 'swatch' + (state.background.color === c ? ' selected' : '');
+    d.style.background = c;
+    d.dataset.color = c;
+    d.addEventListener('click', () => {
+      $$('.swatch').forEach(s => s.classList.remove('selected'));
+      d.classList.add('selected');
+      state.background.color = c;
+      $('#custom-color').value = c;
+      persistBg();
+    });
+    swatchesEl.appendChild(d);
+  });
+  $('#custom-color').addEventListener('input', e => {
+    state.background.color = e.target.value;
+    $$('.swatch').forEach(s => s.classList.remove('selected'));
+    persistBg();
+  });
+
+  function persistBg() {
+    localStorage.setItem('wledgame.background', JSON.stringify(state.background));
+  }
+
+  const briEl = $('#brightness'), briVal = $('#bri-val');
+  briEl.value = state.brightness; briVal.textContent = state.brightness + '%';
+  let briDebounce = 0;
+  briEl.addEventListener('input', e => {
+    state.brightness = Number(e.target.value);
+    briVal.textContent = state.brightness + '%';
+    localStorage.setItem('wledgame.brightness', state.brightness);
+    clearTimeout(briDebounce);
+    briDebounce = setTimeout(() => {
+      send({ type: 'brightness', value: state.brightness });
+    }, 100);
+  });
+
+  $$('.btn-color').forEach(btn => {
+    const fire = () => send({ type: 'shoot', color: btn.dataset.color });
+    btn.addEventListener('click', fire);
+    btn.addEventListener('touchstart', e => { e.preventDefault(); fire(); }, { passive: false });
+  });
+
+  $('#start-btn').addEventListener('click', () => {
+    if (!state.wledId) return;
+    send({
+      type: 'start',
+      wledId: state.wledId,
+      wrongColorMode: state.wrongColorMode,
+      kidsMode: state.kidsMode,
+      background: state.background.mode === 'off'
+        ? { mode: 'off' }
+        : { mode: state.background.mode, color: state.background.color },
+    });
+    show('screen-game');
+  });
+  $('#again-btn').addEventListener('click', () => {
+    const wait = state.cooldownEndTs - Date.now();
+    if (wait > 0) {
+      $('#again-btn').disabled = true;
+      $('#again-btn').textContent = `Aguarda ${Math.ceil(wait/1000)}s…`;
+      setTimeout(() => {
+        $('#again-btn').disabled = false;
+        $('#again-btn').textContent = 'Jogar outra vez';
+        show('screen-start');
+      }, wait);
+    } else {
+      show('screen-start');
+    }
+  });
+
+  function renderWleds() {
+    const sel = $('#wled-select');
+    sel.replaceChildren();
+    for (const w of state.wleds) {
+      const o = document.createElement('option');
+      o.value = w.id;
+      const ledLabel = (w.ledCount == null) ? '?' : String(w.ledCount);
+      o.textContent = `${w.name} (${ledLabel} LEDs)${w.online ? '' : ' — offline'}`;
+      o.disabled = !w.online;
+      sel.appendChild(o);
+    }
+    const firstOnline = state.wleds.find(w => w.online);
+    state.wledId = firstOnline ? firstOnline.id : (state.wleds[0]?.id ?? null);
+    if (state.wledId) sel.value = state.wledId;
+    $('#start-btn').disabled = !firstOnline;
+    sel.addEventListener('change', () => state.wledId = sel.value);
+  }
+
+  function send(obj) {
+    if (state.ws?.readyState === 1) state.ws.send(JSON.stringify(obj));
+  }
+  function connect() {
+    const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+    const ws = new WebSocket(`${proto}://${location.host}/ws`);
+    state.ws = ws;
+    $('#conn').classList.add('reconnecting');
+    ws.addEventListener('open', () => {
+      state.reconnectAttempt = 0;
+      $('#conn').classList.remove('reconnecting');
+    });
+    ws.addEventListener('message', ev => onMessage(JSON.parse(ev.data)));
+    ws.addEventListener('close', scheduleReconnect);
+    ws.addEventListener('error', () => ws.close());
+  }
+  function scheduleReconnect() {
+    $('#conn').classList.add('reconnecting');
+    const delay = Math.min(8000, 1000 * 2 ** state.reconnectAttempt++);
+    setTimeout(connect, delay);
+  }
+
+  function onMessage(m) {
+    switch (m.type) {
+      case 'hello':
+        state.wleds = m.wleds; renderWleds(); break;
+      case 'state':
+        $('#score').textContent = m.score;
+        if (m.phase === 'playing' && document.querySelector('.screen.active').id !== 'screen-game') {
+          show('screen-game');
+        } else if (m.phase === 'idle') {
+          show('screen-start');
+        }
+        break;
+      case 'hit': {
+        $$('.btn-color').forEach(b => { if (b.dataset.color === m.color) flash(b, 'flash'); });
+        navigator.vibrate?.(30);
+        break;
+      }
+      case 'stuck': {
+        $$('.btn-color').forEach(b => { if (b.dataset.color === m.color) flash(b, 'flash-bad'); });
+        navigator.vibrate?.([20, 40, 20]);
+        break;
+      }
+      case 'miss': break;
+      case 'gameOver':
+        state.cooldownEndTs = Date.now() + (m.cooldownMs || 5000);
+        $('#final-score').textContent = m.score;
+        show('screen-over');
+        break;
+      case 'error':
+        if (m.reason === 'cooldown') {
+          state.cooldownEndTs = Date.now() + (m.retryInMs || 0);
+        } else if (m.reason === 'wled_unreachable') {
+          alert('WLED unreachable.');
+        }
+        break;
+      case 'pong': break;
+    }
+  }
+  function flash(el, cls) {
+    el.classList.remove(cls);
+    void el.offsetWidth;
+    el.classList.add(cls);
+  }
+
+  connect();
+  </script>
+</body>
+</html>
