@@ -72,3 +72,37 @@ test('advanceEntities removes shots that reach pos 0', () => {
   advanceEntities(gs, 1.0, 70, 700);
   assert.equal(gs.shots.length, 0);
 });
+
+import { resolveCollisions } from '../src/game.js';
+
+test('consumed mode: same-color shot dissolves single-color cluster', () => {
+  const gs = createGameState({ ledCount: 60, fireZoneLeds: 4 });
+  gs.clusters.push({ id: 1, pos: 500, colors: ['R'] });
+  gs.shots.push({ id: 2, pos: 500, color: 'R' });
+  const events = resolveCollisions(gs, 'consumed');
+  assert.equal(gs.clusters.length, 0);
+  assert.equal(gs.shots.length, 0);
+  assert.equal(gs.score, 1);
+  assert.deepEqual(events, [{ type: 'hit', color: 'R', scoreDelta: 1 }]);
+});
+
+test('consumed mode: wrong-color shot disappears, cluster intact', () => {
+  const gs = createGameState({ ledCount: 60, fireZoneLeds: 4 });
+  gs.clusters.push({ id: 1, pos: 500, colors: ['R'] });
+  gs.shots.push({ id: 2, pos: 500, color: 'G' });
+  const events = resolveCollisions(gs, 'consumed');
+  assert.equal(gs.clusters.length, 1);
+  assert.equal(gs.shots.length, 0);
+  assert.equal(gs.score, 0);
+  assert.deepEqual(events, [{ type: 'miss', color: 'G' }]);
+});
+
+test('shot only resolves against the FIRST cluster it meets (closest to fire)', () => {
+  const gs = createGameState({ ledCount: 60, fireZoneLeds: 4 });
+  gs.clusters.push({ id: 1, pos: 700, colors: ['G'] });
+  gs.clusters.push({ id: 2, pos: 300, colors: ['R'] });
+  gs.shots.push({ id: 3, pos: 700, color: 'R' });
+  resolveCollisions(gs, 'consumed');
+  assert.equal(gs.clusters.length, 2);
+  assert.equal(gs.shots.length, 0);
+});

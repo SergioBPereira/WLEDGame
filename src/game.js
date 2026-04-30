@@ -54,3 +54,39 @@ export function advanceEntities(gs, dtSec, enemyUnitsPerSec, shotUnitsPerSec) {
   }
   gs.shots = gs.shots.filter(s => s.pos > 0);
 }
+
+const COLLISION_EPS = 8.0;
+
+export function resolveCollisions(gs, wrongColorMode) {
+  const events = [];
+  const ledStep = 1000 / gs.ledCount;
+  const sortedClusters = [...gs.clusters].sort((a, b) => b.pos - a.pos);
+
+  for (const shot of [...gs.shots]) {
+    if (shot.pos <= 0) continue;
+    const target = sortedClusters.find(c =>
+      c.pos >= shot.pos - COLLISION_EPS && c.pos <= shot.pos + COLLISION_EPS
+    );
+    if (!target) continue;
+
+    const headColor = target.colors[0];
+    if (shot.color === headColor) {
+      target.colors.shift();
+      gs.shots = gs.shots.filter(s => s.id !== shot.id);
+      gs.score += 1;
+      events.push({ type: 'hit', color: shot.color, scoreDelta: 1 });
+      if (target.colors.length === 0) {
+        gs.clusters = gs.clusters.filter(c => c.id !== target.id);
+      }
+    } else if (wrongColorMode === 'consumed') {
+      gs.shots = gs.shots.filter(s => s.id !== shot.id);
+      events.push({ type: 'miss', color: shot.color });
+    } else if (wrongColorMode === 'stuck') {
+      target.colors.unshift(shot.color);
+      target.pos = Math.min(1000, target.pos + ledStep);
+      gs.shots = gs.shots.filter(s => s.id !== shot.id);
+      events.push({ type: 'stuck', color: shot.color });
+    }
+  }
+  return events;
+}
