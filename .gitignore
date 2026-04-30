@@ -1,0 +1,22 @@
+# Node
+node_modules/
+npm-debug.log*
+
+# Project state
+/var/
+/tmp/
+.env
+.env.*
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Operator-specific config (contains LAN IPs)
+/wleds.json
+
+# IDE
+.vscode/
+.idea/
+*.swp

@@ -1,0 +1,23 @@
+{
+  "name": "wledgame",
+  "version": "0.1.0",
+  "description": "1D LED-strip arcade game served over HTTP+WebSocket, driving WLED via UDP DRGB/DNRGB.",
+  "private": false,
+  "license": "MIT",
+  "type": "module",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "test": "node --test tests/"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "ws": "^8.18.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/<owner>/WLEDGame.git"
+  }
+}
