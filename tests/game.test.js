@@ -144,3 +144,59 @@ test('stuck mode: cluster fully cleared by sequential matches', () => {
   assert.equal(gs.clusters.length, 0);
   assert.equal(gs.score, 3);
 });
+
+import { checkGameOver, renderEntities, startRound, gameOver, leadEntityId } from '../src/game.js';
+
+test('checkGameOver: cluster head reaching fire zone returns true', () => {
+  const gs = createGameState({ ledCount: 60, fireZoneLeds: 4 });
+  gs.clusters.push({ id: 1, pos: 1000 - gs.fireZoneVirtualSize + 0.01, colors: ['R'] });
+  assert.equal(checkGameOver(gs), true);
+});
+
+test('checkGameOver: just before fire zone returns false', () => {
+  const gs = createGameState({ ledCount: 60, fireZoneLeds: 4 });
+  gs.clusters.push({ id: 1, pos: 1000 - gs.fireZoneVirtualSize - 1, colors: ['R'] });
+  assert.equal(checkGameOver(gs), false);
+});
+
+test('startRound transitions idle -> playing, resets score and entities', () => {
+  const gs = createGameState({ ledCount: 60, fireZoneLeds: 4 });
+  gs.score = 99;
+  gs.clusters.push({ id: 5, pos: 500, colors: ['G'] });
+  startRound(gs, {
+    wrongColorMode: 'stuck', kidsMode: false, wledId: 'wled-1',
+    background: { mode: 'off' }, brightness: 70,
+  });
+  assert.equal(gs.phase, 'playing');
+  assert.equal(gs.score, 0);
+  assert.equal(gs.clusters.length, 0);
+  assert.equal(gs.wrongColorMode, 'stuck');
+  assert.equal(gs.brightness, 70);
+});
+
+test('gameOver moves phase to over and sets cooldown', () => {
+  const gs = createGameState({ ledCount: 60, fireZoneLeds: 4 });
+  gs.phase = 'playing';
+  gameOver(gs, 5000, () => 1000);
+  assert.equal(gs.phase, 'over');
+  assert.equal(gs.overUntilTs, 6000);
+});
+
+test('renderEntities flattens clusters with correct trailing positions', () => {
+  const gs = createGameState({ ledCount: 60, fireZoneLeds: 4 });
+  gs.clusters.push({ id: 1, pos: 500, colors: ['G', 'R', 'B'] });
+  gs.shots.push({ id: 99, pos: 200, color: 'B' });
+  const flat = renderEntities(gs);
+  const step = 1000 / 60;
+  assert.equal(flat.find(e => e.id === '1:0').pos, 500);
+  assert.equal(flat.find(e => e.id === '1:0').color, 'G');
+  assert.ok(Math.abs(flat.find(e => e.id === '1:1').pos - (500 - step)) < 0.001);
+  assert.equal(flat.find(e => e.id === 'shot:99').color, 'B');
+});
+
+test('leadEntityId returns head id of cluster nearest to fire', () => {
+  const gs = createGameState({ ledCount: 60, fireZoneLeds: 4 });
+  gs.clusters.push({ id: 1, pos: 300, colors: ['R'] });
+  gs.clusters.push({ id: 2, pos: 700, colors: ['G'] });
+  assert.equal(leadEntityId(gs), '2:0');
+});

@@ -90,3 +90,62 @@ export function resolveCollisions(gs, wrongColorMode) {
   }
   return events;
 }
+
+export function startRound(gs, opts) {
+  gs.phase = 'playing';
+  gs.score = 0;
+  gs.clusters = [];
+  gs.shots = [];
+  gs.wrongColorMode = opts.wrongColorMode;
+  gs.kidsMode = !!opts.kidsMode;
+  gs.wledId = opts.wledId;
+  gs.background = opts.background;
+  gs.brightness = opts.brightness ?? 70;
+  gs.startedAt = Date.now();
+}
+
+export function gameOver(gs, cooldownMs, nowFn = Date.now) {
+  gs.phase = 'over';
+  gs.overUntilTs = nowFn() + cooldownMs;
+}
+
+export function checkGameOver(gs) {
+  const fireBoundary = 1000 - gs.fireZoneVirtualSize;
+  for (const c of gs.clusters) {
+    if (c.pos >= fireBoundary) return true;
+  }
+  return false;
+}
+
+export function renderEntities(gs) {
+  const out = [];
+  const step = 1000 / gs.ledCount;
+  for (const c of gs.clusters) {
+    for (let i = 0; i < c.colors.length; i++) {
+      out.push({
+        id: `${c.id}:${i}`,
+        pos: Math.max(0, c.pos - i * step),
+        color: c.colors[i],
+      });
+    }
+  }
+  for (const s of gs.shots) {
+    out.push({ id: `shot:${s.id}`, pos: s.pos, color: s.color });
+  }
+  out.sort((a, b) => {
+    function rank(e) {
+      if (e.id.startsWith('shot:')) return 2;
+      const idx = Number(e.id.split(':')[1]);
+      return idx === 0 ? 1 : 0;
+    }
+    return rank(a) - rank(b);
+  });
+  return out;
+}
+
+export function leadEntityId(gs) {
+  if (gs.clusters.length === 0) return null;
+  let best = gs.clusters[0];
+  for (const c of gs.clusters) if (c.pos > best.pos) best = c;
+  return `${best.id}:0`;
+}
