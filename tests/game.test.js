@@ -106,3 +106,41 @@ test('shot only resolves against the FIRST cluster it meets (closest to fire)', 
   assert.equal(gs.clusters.length, 2);
   assert.equal(gs.shots.length, 0);
 });
+
+test('stuck mode: wrong-color shot becomes new head, kicks cluster +1 LED', () => {
+  const gs = createGameState({ ledCount: 60, fireZoneLeds: 4 });
+  gs.clusters.push({ id: 1, pos: 500, colors: ['R'] });
+  gs.shots.push({ id: 2, pos: 500, color: 'G' });
+  const events = resolveCollisions(gs, 'stuck');
+  assert.equal(gs.clusters.length, 1);
+  const c = gs.clusters[0];
+  assert.deepEqual(c.colors, ['G', 'R']);
+  assert.ok(Math.abs(c.pos - (500 + 1000/60)) < 0.001);
+  assert.equal(gs.score, 0);
+  assert.deepEqual(events, [{ type: 'stuck', color: 'G' }]);
+});
+
+test('stuck mode: same-color shot pops only the head', () => {
+  const gs = createGameState({ ledCount: 60, fireZoneLeds: 4 });
+  gs.clusters.push({ id: 1, pos: 500, colors: ['G', 'R'] });
+  gs.shots.push({ id: 2, pos: 500, color: 'G' });
+  resolveCollisions(gs, 'stuck');
+  assert.equal(gs.clusters.length, 1);
+  assert.deepEqual(gs.clusters[0].colors, ['R']);
+  assert.equal(gs.score, 1);
+});
+
+test('stuck mode: cluster fully cleared by sequential matches', () => {
+  const gs = createGameState({ ledCount: 60, fireZoneLeds: 4 });
+  gs.clusters.push({ id: 1, pos: 500, colors: ['G', 'R', 'B'] });
+  gs.shots.push({ id: 2, pos: 500, color: 'G' });
+  resolveCollisions(gs, 'stuck');
+  assert.deepEqual(gs.clusters[0].colors, ['R', 'B']);
+  gs.shots.push({ id: 3, pos: gs.clusters[0].pos, color: 'R' });
+  resolveCollisions(gs, 'stuck');
+  assert.deepEqual(gs.clusters[0].colors, ['B']);
+  gs.shots.push({ id: 4, pos: gs.clusters[0].pos, color: 'B' });
+  resolveCollisions(gs, 'stuck');
+  assert.equal(gs.clusters.length, 0);
+  assert.equal(gs.score, 3);
+});
