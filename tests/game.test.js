@@ -200,3 +200,18 @@ test('leadEntityId returns head id of cluster nearest to fire', () => {
   gs.clusters.push({ id: 2, pos: 700, colors: ['G'] });
   assert.equal(leadEntityId(gs), '2:0');
 });
+
+test('fast shot does not tunnel past slow cluster (regression)', () => {
+  // At 30fps with shotSpeed=700 u/s, a shot moves ~23 units per tick.
+  // Simulate one frame where the shot crosses a cluster:
+  //   prev positions: shot=210, cluster=195   (15 apart, outside old EPS=8)
+  //   post-advance:   shot=187, cluster=197   (10 apart, also outside old EPS=8)
+  // The fix must register the hit because the cluster lay in the swept range [187, 210].
+  const gs = createGameState({ ledCount: 60, fireZoneLeds: 4 });
+  gs.clusters.push({ id: 1, pos: 197, colors: ['R'] });
+  gs.shots.push({ id: 2, pos: 187, prevPos: 210, color: 'R' });
+  const events = resolveCollisions(gs, 'consumed');
+  assert.equal(gs.clusters.length, 0, 'cluster should be destroyed');
+  assert.equal(gs.score, 1);
+  assert.deepEqual(events, [{ type: 'hit', color: 'R', scoreDelta: 1 }]);
+});

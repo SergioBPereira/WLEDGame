@@ -50,12 +50,13 @@ export function advanceEntities(gs, dtSec, enemyUnitsPerSec, shotUnitsPerSec) {
     c.pos += enemyUnitsPerSec * dtSec;
   }
   for (const s of gs.shots) {
+    s.prevPos = s.pos;
     s.pos -= shotUnitsPerSec * dtSec;
   }
   gs.shots = gs.shots.filter(s => s.pos > 0);
 }
 
-const COLLISION_EPS = 8.0;
+const SWEEP_PAD = 4.0;  // covers cluster motion within the same frame + numerical jitter
 
 export function resolveCollisions(gs, wrongColorMode) {
   const events = [];
@@ -64,9 +65,10 @@ export function resolveCollisions(gs, wrongColorMode) {
 
   for (const shot of [...gs.shots]) {
     if (shot.pos <= 0) continue;
-    const target = sortedClusters.find(c =>
-      c.pos >= shot.pos - COLLISION_EPS && c.pos <= shot.pos + COLLISION_EPS
-    );
+    const lo = shot.pos - SWEEP_PAD;
+    const hi = (shot.prevPos ?? shot.pos) + SWEEP_PAD;
+    // Pick the cluster with highest pos (closest to fire) within the swept band.
+    const target = sortedClusters.find(c => c.pos >= lo && c.pos <= hi);
     if (!target) continue;
 
     const headColor = target.colors[0];
