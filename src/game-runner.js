@@ -22,7 +22,7 @@ export function createGameRunner({ cfg, wledStore, sender, broadcast, broadcastF
     gs = createGameState({ ledCount, fireZoneLeds: cfg.fireZoneLeds });
   }
 
-  async function start({ wledId, wrongColorMode, kidsMode, background, brightness }) {
+  async function start({ wledId, wrongColorMode, kidsMode, wEnemies, background, brightness }) {
     if (gs && gs.phase === 'playing') return { ok: false, reason: 'already_running' };
     if (gs && gs.phase === 'over' && Date.now() < gs.overUntilTs) {
       return { ok: false, reason: 'cooldown', retryInMs: gs.overUntilTs - Date.now() };
@@ -37,7 +37,7 @@ export function createGameRunner({ cfg, wledStore, sender, broadcast, broadcastF
     reset(w.ledCount);
     try { await wledStore.saveStateFor(w.id); }
     catch (e) { log.warn('save state failed, continuing', { error: String(e.message || e) }); }
-    startRound(gs, { wrongColorMode, kidsMode, wledId: w.id, background, brightness });
+    startRound(gs, { wrongColorMode, kidsMode, wEnemies, wledId: w.id, background, brightness });
     lastFrameTs = Date.now();
     lastSpawnTs = lastFrameTs;
     broadcast(stateMessage());
@@ -84,7 +84,12 @@ export function createGameRunner({ cfg, wledStore, sender, broadcast, broadcastF
     const cur = gs.kidsMode ? applyKidsMode(cfg.game) : cfg.game;
     const spawnEvery = spawnInterval(gs.score, cur);
     if (now - lastSpawnTs >= spawnEvery) {
-      const c = COLORS[Math.floor(Math.random() * COLORS.length)];
+      let c;
+      if (gs.wEnemies && Math.random() < 0.10) {
+        c = 'W';
+      } else {
+        c = COLORS[Math.floor(Math.random() * COLORS.length)];
+      }
       spawnEnemy(gs, c);
       lastSpawnTs = now;
     }
@@ -133,6 +138,7 @@ export function createGameRunner({ cfg, wledStore, sender, broadcast, broadcastF
       wledId: gs?.wledId ?? null,
       wrongColorMode: gs?.wrongColorMode ?? null,
       kidsMode: !!gs?.kidsMode,
+      wEnemies: !!gs?.wEnemies,
       background: gs?.background ?? { mode: 'off' },
       brightness: gs?.brightness ?? 70,
     };

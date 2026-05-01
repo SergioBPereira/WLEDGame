@@ -139,7 +139,7 @@ test('renderFrame end-to-end: one entity painted, brightness 50% halves it', () 
   const out = renderFrame({
     ledCount: 100, t: 0,
     background: { mode: 'off' },
-    entities: [{ id: 1, pos: 100, color: 'R' }],
+    entities: [{ id: 1, pos: 100, rgb: [255, 0, 0] }],
     leadId: null,
     brightness: 50,
     cfg,

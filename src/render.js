@@ -1,4 +1,4 @@
-import { parseHex, baseColor } from './color.js';
+import { parseHex } from './color.js';
 
 export function newFrame(ledCount) {
   return new Uint8Array(ledCount * 3);
@@ -84,8 +84,7 @@ export function renderFrame({ ledCount, t, background, entities, leadId, brightn
   renderBackground(frame, background, ledCount, fireZoneLeds, t, cfg.render);
   renderFireZone(frame, ledCount, fireZoneLeds, t);
   for (const e of entities) {
-    const rgb = baseColor(e.color);
-    renderEntity(frame, e.pos, rgb, ledCount, e.id === leadId, t, cfg.render);
+    renderEntity(frame, e.pos, e.rgb, ledCount, e.id === leadId, t, cfg.render);
   }
   applyBrightness(frame, brightness);
   return frame;

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { spawnInterval, enemySpeed, makeIdGen, applyKidsMode } from '../src/game.js';
+import { spawnInterval, enemySpeed, makeIdGen, applyKidsMode, maskFromColor, maskRgb } from '../src/game.js';
 
 const baseGameCfg = {
   spawnBaseMs: 1800, spawnEvery: 5, spawnStepMs: 60, spawnMinMs: 500,
@@ -54,8 +54,8 @@ test('spawnEnemy creates a cluster at pos 0 with one R/G/B color', () => {
   spawnEnemy(gs, 'R');
   assert.equal(gs.clusters.length, 1);
   const c = gs.clusters[0];
-  assert.equal(c.colors.length, 1);
-  assert.equal(c.colors[0], 'R');
+  assert.equal(c.masks.length, 1);
+  assert.equal(c.masks[0], 1);  // R
   assert.equal(c.pos, 0);
 });
 
@@ -77,7 +77,7 @@ import { resolveCollisions } from '../src/game.js';
 
 test('consumed mode: same-color shot dissolves single-color cluster', () => {
   const gs = createGameState({ ledCount: 60, fireZoneLeds: 4 });
-  gs.clusters.push({ id: 1, pos: 500, colors: ['R'] });
+  gs.clusters.push({ id: 1, pos: 500, masks: [1] });
   gs.shots.push({ id: 2, pos: 500, color: 'R' });
   const events = resolveCollisions(gs, 'consumed');
   assert.equal(gs.clusters.length, 0);
@@ -88,7 +88,7 @@ test('consumed mode: same-color shot dissolves single-color cluster', () => {
 
 test('consumed mode: wrong-color shot disappears, cluster intact', () => {
   const gs = createGameState({ ledCount: 60, fireZoneLeds: 4 });
-  gs.clusters.push({ id: 1, pos: 500, colors: ['R'] });
+  gs.clusters.push({ id: 1, pos: 500, masks: [1] });
   gs.shots.push({ id: 2, pos: 500, color: 'G' });
   const events = resolveCollisions(gs, 'consumed');
   assert.equal(gs.clusters.length, 1);
@@ -99,8 +99,8 @@ test('consumed mode: wrong-color shot disappears, cluster intact', () => {
 
 test('shot only resolves against the FIRST cluster it meets (closest to fire)', () => {
   const gs = createGameState({ ledCount: 60, fireZoneLeds: 4 });
-  gs.clusters.push({ id: 1, pos: 700, colors: ['G'] });
-  gs.clusters.push({ id: 2, pos: 300, colors: ['R'] });
+  gs.clusters.push({ id: 1, pos: 700, masks: [2] });
+  gs.clusters.push({ id: 2, pos: 300, masks: [1] });
   gs.shots.push({ id: 3, pos: 700, color: 'R' });
   resolveCollisions(gs, 'consumed');
   assert.equal(gs.clusters.length, 2);
@@ -109,12 +109,12 @@ test('shot only resolves against the FIRST cluster it meets (closest to fire)', 
 
 test('stuck mode: wrong-color shot becomes new head, kicks cluster +1 LED', () => {
   const gs = createGameState({ ledCount: 60, fireZoneLeds: 4 });
-  gs.clusters.push({ id: 1, pos: 500, colors: ['R'] });
+  gs.clusters.push({ id: 1, pos: 500, masks: [1] });
   gs.shots.push({ id: 2, pos: 500, color: 'G' });
   const events = resolveCollisions(gs, 'stuck');
   assert.equal(gs.clusters.length, 1);
   const c = gs.clusters[0];
-  assert.deepEqual(c.colors, ['G', 'R']);
+  assert.deepEqual(c.masks, [2, 1]);
   assert.ok(Math.abs(c.pos - (500 + 1000/60)) < 0.001);
   assert.equal(gs.score, 0);
   assert.deepEqual(events, [{ type: 'stuck', color: 'G' }]);
@@ -122,23 +122,23 @@ test('stuck mode: wrong-color shot becomes new head, kicks cluster +1 LED', () =
 
 test('stuck mode: same-color shot pops only the head', () => {
   const gs = createGameState({ ledCount: 60, fireZoneLeds: 4 });
-  gs.clusters.push({ id: 1, pos: 500, colors: ['G', 'R'] });
+  gs.clusters.push({ id: 1, pos: 500, masks: [2, 1] });
   gs.shots.push({ id: 2, pos: 500, color: 'G' });
   resolveCollisions(gs, 'stuck');
   assert.equal(gs.clusters.length, 1);
-  assert.deepEqual(gs.clusters[0].colors, ['R']);
+  assert.deepEqual(gs.clusters[0].masks, [1]);
   assert.equal(gs.score, 1);
 });
 
 test('stuck mode: cluster fully cleared by sequential matches', () => {
   const gs = createGameState({ ledCount: 60, fireZoneLeds: 4 });
-  gs.clusters.push({ id: 1, pos: 500, colors: ['G', 'R', 'B'] });
+  gs.clusters.push({ id: 1, pos: 500, masks: [2, 1, 4] });
   gs.shots.push({ id: 2, pos: 500, color: 'G' });
   resolveCollisions(gs, 'stuck');
-  assert.deepEqual(gs.clusters[0].colors, ['R', 'B']);
+  assert.deepEqual(gs.clusters[0].masks, [1, 4]);
   gs.shots.push({ id: 3, pos: gs.clusters[0].pos, color: 'R' });
   resolveCollisions(gs, 'stuck');
-  assert.deepEqual(gs.clusters[0].colors, ['B']);
+  assert.deepEqual(gs.clusters[0].masks, [4]);
   gs.shots.push({ id: 4, pos: gs.clusters[0].pos, color: 'B' });
   resolveCollisions(gs, 'stuck');
   assert.equal(gs.clusters.length, 0);
@@ -149,20 +149,20 @@ import { checkGameOver, renderEntities, startRound, gameOver, leadEntityId } fro
 
 test('checkGameOver: cluster head reaching fire zone returns true', () => {
   const gs = createGameState({ ledCount: 60, fireZoneLeds: 4 });
-  gs.clusters.push({ id: 1, pos: 1000 - gs.fireZoneVirtualSize + 0.01, colors: ['R'] });
+  gs.clusters.push({ id: 1, pos: 1000 - gs.fireZoneVirtualSize + 0.01, masks: [1] });
   assert.equal(checkGameOver(gs), true);
 });
 
 test('checkGameOver: just before fire zone returns false', () => {
   const gs = createGameState({ ledCount: 60, fireZoneLeds: 4 });
-  gs.clusters.push({ id: 1, pos: 1000 - gs.fireZoneVirtualSize - 1, colors: ['R'] });
+  gs.clusters.push({ id: 1, pos: 1000 - gs.fireZoneVirtualSize - 1, masks: [1] });
   assert.equal(checkGameOver(gs), false);
 });
 
 test('startRound transitions idle -> playing, resets score and entities', () => {
   const gs = createGameState({ ledCount: 60, fireZoneLeds: 4 });
   gs.score = 99;
-  gs.clusters.push({ id: 5, pos: 500, colors: ['G'] });
+  gs.clusters.push({ id: 5, pos: 500, masks: [2] });
   startRound(gs, {
     wrongColorMode: 'stuck', kidsMode: false, wledId: 'wled-1',
     background: { mode: 'off' }, brightness: 70,
@@ -184,20 +184,20 @@ test('gameOver moves phase to over and sets cooldown', () => {
 
 test('renderEntities flattens clusters with correct trailing positions', () => {
   const gs = createGameState({ ledCount: 60, fireZoneLeds: 4 });
-  gs.clusters.push({ id: 1, pos: 500, colors: ['G', 'R', 'B'] });
+  gs.clusters.push({ id: 1, pos: 500, masks: [2, 1, 4] });
   gs.shots.push({ id: 99, pos: 200, color: 'B' });
   const flat = renderEntities(gs);
   const step = 1000 / 60;
   assert.equal(flat.find(e => e.id === '1:0').pos, 500);
-  assert.equal(flat.find(e => e.id === '1:0').color, 'G');
+  assert.deepEqual(flat.find(e => e.id === '1:0').rgb, [0, 255, 0]);
   assert.ok(Math.abs(flat.find(e => e.id === '1:1').pos - (500 - step)) < 0.001);
-  assert.equal(flat.find(e => e.id === 'shot:99').color, 'B');
+  assert.deepEqual(flat.find(e => e.id === 'shot:99').rgb, [0, 0, 255]);
 });
 
 test('leadEntityId returns head id of cluster nearest to fire', () => {
   const gs = createGameState({ ledCount: 60, fireZoneLeds: 4 });
-  gs.clusters.push({ id: 1, pos: 300, colors: ['R'] });
-  gs.clusters.push({ id: 2, pos: 700, colors: ['G'] });
+  gs.clusters.push({ id: 1, pos: 300, masks: [1] });
+  gs.clusters.push({ id: 2, pos: 700, masks: [2] });
   assert.equal(leadEntityId(gs), '2:0');
 });
 
@@ -208,10 +208,59 @@ test('fast shot does not tunnel past slow cluster (regression)', () => {
   //   post-advance:   shot=187, cluster=197   (10 apart, also outside old EPS=8)
   // The fix must register the hit because the cluster lay in the swept range [187, 210].
   const gs = createGameState({ ledCount: 60, fireZoneLeds: 4 });
-  gs.clusters.push({ id: 1, pos: 197, colors: ['R'] });
+  gs.clusters.push({ id: 1, pos: 197, masks: [1] });
   gs.shots.push({ id: 2, pos: 187, prevPos: 210, color: 'R' });
   const events = resolveCollisions(gs, 'consumed');
   assert.equal(gs.clusters.length, 0, 'cluster should be destroyed');
   assert.equal(gs.score, 1);
   assert.deepEqual(events, [{ type: 'hit', color: 'R', scoreDelta: 1 }]);
+});
+
+test('W enemy: hitting with R clears R, mask becomes G+B (cyan)', () => {
+  const gs = createGameState({ ledCount: 60, fireZoneLeds: 4 });
+  spawnEnemy(gs, 'W');
+  gs.clusters[0].pos = 500;
+  gs.shots.push({ id: 99, pos: 500, color: 'R' });
+  const events = resolveCollisions(gs, 'consumed');
+  assert.equal(gs.clusters.length, 1);
+  assert.deepEqual(gs.clusters[0].masks, [6]);  // G+B = cyan
+  assert.equal(gs.score, 1);
+  assert.deepEqual(events, [{ type: 'hit', color: 'R', scoreDelta: 1 }]);
+});
+
+test('W enemy: three correct hits in any order defeat it (+3 score)', () => {
+  const gs = createGameState({ ledCount: 60, fireZoneLeds: 4 });
+  spawnEnemy(gs, 'W');
+  gs.clusters[0].pos = 500;
+  for (const c of ['B', 'R', 'G']) {
+    gs.shots.push({ id: gs.nextId(), pos: gs.clusters[0]?.pos ?? 500, color: c });
+    resolveCollisions(gs, 'consumed');
+  }
+  assert.equal(gs.clusters.length, 0);
+  assert.equal(gs.score, 3);
+});
+
+test('W enemy stuck mode: shot of already-cleared color attaches as new head', () => {
+  const gs = createGameState({ ledCount: 60, fireZoneLeds: 4 });
+  spawnEnemy(gs, 'W');
+  gs.clusters[0].pos = 500;
+  // Hit with R → mask becomes 6 (G+B = cyan)
+  gs.shots.push({ id: gs.nextId(), pos: 500, color: 'R' });
+  resolveCollisions(gs, 'stuck');
+  assert.deepEqual(gs.clusters[0].masks, [6]);
+  // Hit with R again — R is no longer in the W head's set. In stuck mode, R sticks as a new single-bit head.
+  const posAfterFirst = gs.clusters[0].pos;
+  gs.shots.push({ id: gs.nextId(), pos: posAfterFirst, color: 'R' });
+  resolveCollisions(gs, 'stuck');
+  assert.deepEqual(gs.clusters[0].masks, [1, 6]);  // R head, then cyan W trailing
+  assert.ok(gs.clusters[0].pos > posAfterFirst);
+});
+
+test('renderEntities emits rgb per entity for W heads', () => {
+  const gs = createGameState({ ledCount: 60, fireZoneLeds: 4 });
+  spawnEnemy(gs, 'W');
+  gs.clusters[0].pos = 500;
+  const flat = renderEntities(gs);
+  const head = flat.find(e => e.id === '1:0');
+  assert.deepEqual(head.rgb, [255, 255, 255]);
 });

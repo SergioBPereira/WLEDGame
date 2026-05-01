@@ -67,6 +67,12 @@
         <button data-kids="true">Yes</button>
       </div></div>
 
+    <div class="row"><label style="flex:0 0 6em">W enemies</label>
+      <div class="picker" style="flex:1">
+        <button data-w="false" class="selected">Off</button>
+        <button data-w="true">On</button>
+      </div></div>
+
     <div>
       <div class="row"><label style="flex:0 0 6em">Background</label>
         <div class="picker" style="flex:1">
@@ -125,6 +131,7 @@
   const state = {
     wleds: [], wledId: null,
     wrongColorMode: 'consumed', kidsMode: false,
+    wEnemies: localStorage.getItem('wledgame.wEnemies') === 'true',
     background: { mode: 'off', color: SWATCHES[1] },
     brightness: Number(localStorage.getItem('wledgame.brightness') || 70),
     preview: localStorage.getItem('wledgame.preview') === 'true',
@@ -156,6 +163,10 @@
 
   bindPicker('.picker [data-mode]', b => state.wrongColorMode = b.dataset.mode);
   bindPicker('.picker [data-kids]', b => state.kidsMode = b.dataset.kids === 'true');
+  bindPicker('.picker [data-w]', b => {
+    state.wEnemies = b.dataset.w === 'true';
+    localStorage.setItem('wledgame.wEnemies', String(state.wEnemies));
+  });
   bindPicker('.picker [data-bg]', b => {
     state.background.mode = b.dataset.bg;
     $('#bg-color-row').style.display = b.dataset.bg === 'off' ? 'none' : '';
@@ -219,6 +230,7 @@
       wledId: state.wledId,
       wrongColorMode: state.wrongColorMode,
       kidsMode: state.kidsMode,
+      wEnemies: state.wEnemies,
       background: state.background.mode === 'off'
         ? { mode: 'off' }
         : { mode: state.background.mode, color: state.background.color },
@@ -353,6 +365,9 @@
     b.classList.toggle('selected', (b.dataset.preview === 'true') === state.preview);
   });
   $('#strip-wrap').style.display = state.preview ? '' : 'none';
+  $$('.picker [data-w]').forEach(b => {
+    b.classList.toggle('selected', (b.dataset.w === 'true') === state.wEnemies);
+  });
 
   connect();
   </script>

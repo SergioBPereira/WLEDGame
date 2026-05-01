@@ -1,3 +1,16 @@
+// Channel masks. R=1, G=2, B=4. Combinations: Y=3 (R+G), M=5 (R+B), C=6 (G+B), W=7 (R+G+B).
+const COLOR_TO_MASK = { R: 1, G: 2, B: 4, W: 7 };
+
+export function maskFromColor(c) {
+  const m = COLOR_TO_MASK[c];
+  if (m === undefined) throw new Error(`bad color: ${c}`);
+  return m;
+}
+
+export function maskRgb(m) {
+  return [(m & 1) ? 255 : 0, (m & 2) ? 255 : 0, (m & 4) ? 255 : 0];
+}
+
 export function makeIdGen() {
   let n = 0;
   return () => ++n;
@@ -41,7 +54,7 @@ export function spawnEnemy(gs, color) {
   gs.clusters.push({
     id: gs.nextId(),
     pos: 0,
-    colors: [color],
+    masks: [maskFromColor(color)],
   });
 }
 
@@ -71,20 +84,28 @@ export function resolveCollisions(gs, wrongColorMode) {
     const target = sortedClusters.find(c => c.pos >= lo && c.pos <= hi);
     if (!target) continue;
 
-    const headColor = target.colors[0];
-    if (shot.color === headColor) {
-      target.colors.shift();
+    const headMask = target.masks[0];
+    const cBit = maskFromColor(shot.color);  // shot is always single-channel R/G/B
+
+    if (headMask & cBit) {
+      // Channel hit. Clear that bit.
+      const newMask = headMask & ~cBit;
       gs.shots = gs.shots.filter(s => s.id !== shot.id);
       gs.score += 1;
       events.push({ type: 'hit', color: shot.color, scoreDelta: 1 });
-      if (target.colors.length === 0) {
-        gs.clusters = gs.clusters.filter(c => c.id !== target.id);
+      if (newMask === 0) {
+        target.masks.shift();
+        if (target.masks.length === 0) {
+          gs.clusters = gs.clusters.filter(c => c.id !== target.id);
+        }
+      } else {
+        target.masks[0] = newMask;
       }
     } else if (wrongColorMode === 'consumed') {
       gs.shots = gs.shots.filter(s => s.id !== shot.id);
       events.push({ type: 'miss', color: shot.color });
     } else if (wrongColorMode === 'stuck') {
-      target.colors.unshift(shot.color);
+      target.masks.unshift(cBit);
       target.pos = Math.min(1000, target.pos + ledStep);
       gs.shots = gs.shots.filter(s => s.id !== shot.id);
       events.push({ type: 'stuck', color: shot.color });
@@ -100,6 +121,7 @@ export function startRound(gs, opts) {
   gs.shots = [];
   gs.wrongColorMode = opts.wrongColorMode;
   gs.kidsMode = !!opts.kidsMode;
+  gs.wEnemies = !!opts.wEnemies;
   gs.wledId = opts.wledId;
   gs.background = opts.background;
   gs.brightness = opts.brightness ?? 70;
@@ -123,16 +145,16 @@ export function renderEntities(gs) {
   const out = [];
   const step = 1000 / gs.ledCount;
   for (const c of gs.clusters) {
-    for (let i = 0; i < c.colors.length; i++) {
+    for (let i = 0; i < c.masks.length; i++) {
       out.push({
         id: `${c.id}:${i}`,
         pos: Math.max(0, c.pos - i * step),
-        color: c.colors[i],
+        rgb: maskRgb(c.masks[i]),
       });
     }
   }
   for (const s of gs.shots) {
-    out.push({ id: `shot:${s.id}`, pos: s.pos, color: s.color });
+    out.push({ id: `shot:${s.id}`, pos: s.pos, rgb: maskRgb(maskFromColor(s.color)) });
   }
   out.sort((a, b) => {
     function rank(e) {

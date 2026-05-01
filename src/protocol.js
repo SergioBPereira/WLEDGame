@@ -27,12 +27,13 @@ export function parseClientMessage(raw) {
       if (typeof m.wledId !== 'string' || !m.wledId) bad('start.wledId');
       if (!VALID_MODES.has(m.wrongColorMode)) bad('start.wrongColorMode');
       const kidsMode = !!m.kidsMode;
+      const wEnemies = !!m.wEnemies;
       const bg = m.background || { mode: 'off' };
       if (!VALID_BG_MODES.has(bg.mode)) bad('start.background.mode');
       if (bg.mode !== 'off') {
         if (typeof bg.color !== 'string' || !/^#[0-9a-fA-F]{6}$/.test(bg.color)) bad('start.background.color');
       }
-      return { type: 'start', wledId: m.wledId, wrongColorMode: m.wrongColorMode, kidsMode, background: bg };
+      return { type: 'start', wledId: m.wledId, wrongColorMode: m.wrongColorMode, kidsMode, wEnemies, background: bg };
     }
     case 'preview': {
       return { type: 'preview', enabled: !!m.enabled };
