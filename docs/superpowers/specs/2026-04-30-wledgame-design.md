@@ -46,7 +46,7 @@ The game world is **0–1000 virtual units**, regardless of physical LED count. 
 
 ### 5.2 Entities
 
-- **Enemy**: `{id, pos: 0..1000, color: 'R'|'G'|'B', cluster: ClusterId}`. Spawned with random color, advances toward 1000. *(v0.2 will extend `color` to a bitmask for multi-color enemies — see backlog item M; v0.1 should keep enemy color access narrow so the migration is mechanical.)*
+- **Enemy**: `{id, pos: 0..1000, color: 'R'|'G'|'B', cluster: ClusterId}`. Spawned with random color, advances toward 1000. *(v0.2 will extend `color` to a bitmask for multi-color enemies — see backlog item M; v0.1 should keep enemy color access narrow so the migration is mechanical. Item M was subsequently implemented as a per-round opt-in toggle, default off.)*
 - **Shot**: `{id, pos: 0..1000, color: 'R'|'G'|'B'}`. Spawned at the fire-zone edge (`pos = 1000 - fireZoneVirtualSize`), travels toward 0.
 - **Cluster** (stuck-at-front mode only): an enemy plus zero or more attached wrong-color shots. The cluster has an ordered sequence of colors from leading-edge (fire-facing) to trailing-edge. The leading edge color is the **head**, what the player must match next.
 
