@@ -54,7 +54,7 @@ export function spawnEnemy(gs, color) {
   gs.clusters.push({
     id: gs.nextId(),
     pos: 0,
-    masks: [maskFromColor(color)],
+    heads: [{ mask: maskFromColor(color), hits: 0 }],
   });
 }
 
@@ -80,35 +80,38 @@ export function resolveCollisions(gs, wrongColorMode) {
     if (shot.pos <= 0) continue;
     const lo = shot.pos - SWEEP_PAD;
     const hi = (shot.prevPos ?? shot.pos) + SWEEP_PAD;
-    // Pick the cluster with highest pos (closest to fire) within the swept band.
     const target = sortedClusters.find(c => c.pos >= lo && c.pos <= hi);
     if (!target) continue;
 
-    const headMask = target.masks[0];
-    const cBit = maskFromColor(shot.color);  // shot is always single-channel R/G/B
+    const headRec = target.heads[0];
+    const cBit = maskFromColor(shot.color);
 
-    if (headMask & cBit) {
-      // Channel hit. Clear that bit.
-      const newMask = headMask & ~cBit;
+    if (headRec.mask & cBit) {
+      // Channel hit. Clear that bit; award score only on full defeat of this head.
+      headRec.mask &= ~cBit;
+      headRec.hits += 1;
       gs.shots = gs.shots.filter(s => s.id !== shot.id);
-      gs.score += 1;
-      events.push({ type: 'hit', color: shot.color, scoreDelta: 1 });
-      if (newMask === 0) {
-        target.masks.shift();
-        if (target.masks.length === 0) {
+      if (headRec.mask === 0) {
+        const award = headRec.hits;
+        gs.score += award;
+        target.heads.shift();
+        events.push({ type: 'hit', color: shot.color, scoreDelta: award });
+        if (target.heads.length === 0) {
           gs.clusters = gs.clusters.filter(c => c.id !== target.id);
         }
       } else {
-        target.masks[0] = newMask;
+        // Channel cleared but head not yet defeated (W mid-fight). No score awarded yet.
+        events.push({ type: 'hit', color: shot.color, scoreDelta: 0 });
       }
     } else if (wrongColorMode === 'consumed') {
       gs.shots = gs.shots.filter(s => s.id !== shot.id);
       events.push({ type: 'miss', color: shot.color });
     } else if (wrongColorMode === 'stuck') {
-      target.masks.unshift(cBit);
+      target.heads.unshift({ mask: cBit, hits: 0 });
       target.pos = Math.min(1000, target.pos + ledStep);
       gs.shots = gs.shots.filter(s => s.id !== shot.id);
-      events.push({ type: 'stuck', color: shot.color });
+      gs.score -= 1;  // anti-grinding: sticking a head costs a point.
+      events.push({ type: 'stuck', color: shot.color, scoreDelta: -1 });
     }
   }
   return events;
@@ -145,11 +148,11 @@ export function renderEntities(gs) {
   const out = [];
   const step = 1000 / gs.ledCount;
   for (const c of gs.clusters) {
-    for (let i = 0; i < c.masks.length; i++) {
+    for (let i = 0; i < c.heads.length; i++) {
       out.push({
         id: `${c.id}:${i}`,
         pos: Math.max(0, c.pos - i * step),
-        rgb: maskRgb(c.masks[i]),
+        rgb: maskRgb(c.heads[i].mask),
       });
     }
   }

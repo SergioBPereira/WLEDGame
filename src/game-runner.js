@@ -98,7 +98,7 @@ export function createGameRunner({ cfg, wledStore, sender, broadcast, broadcastF
 
     const events = resolveCollisions(gs, gs.wrongColorMode);
     for (const e of events) broadcast(e);
-    if (events.some(e => e.type === 'hit')) broadcast(stateMessage());
+    if (events.some(e => (e.scoreDelta ?? 0) !== 0)) broadcast(stateMessage());
 
     if (checkGameOver(gs)) {
       gameOver(gs, cfg.game.gameOverCooldownMs);
