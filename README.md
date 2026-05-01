@@ -4,10 +4,6 @@ A 1D arcade game played on a WLED-driven LED strip, controlled from your phone.
 
 Enemies of three colors creep along the strip toward a flickering "fire" at one end. Hit them with the matching color before they reach it. Two game modes, an optional kids mode, an in-game brightness slider, and a configurable background flavor color. Designed to drive any [WLED](https://kno.wled.ge/)-flashed strip on your LAN over UDP DRGB/DNRGB at 30 fps.
 
-## Demo
-
-(Add a GIF/video here once you have one.)
-
 ## How to play
 
 - Three big buttons on your phone: **Red**, **Green**, **Blue**.
