@@ -29,16 +29,21 @@ async function main() {
     broadcastFrame: (rgb) => wsLayer?.broadcastFrame(rgb),
   });
 
+  const SUPPORTED_LANGS = ['en', 'pt', 'fr'];
+  const defaultLang = SUPPORTED_LANGS.includes(cfg.defaultLang) ? cfg.defaultLang : 'en';
   const handler = createHttpHandler({
     publicDir: join(ROOT, 'public'),
     getApiState: () => runner.snapshot(),
     getApiWleds: () => wledStore.list().map(w => ({
       id: w.id, name: w.name || w.host, host: w.host, ledCount: w.ledCount, online: w.online,
     })),
+    getApiConfig: () => ({ defaultLang, supportedLangs: SUPPORTED_LANGS }),
+    onClientHit: () => { wledStore.maybeReprobe().catch(() => {}); },
   });
   const httpServer = http.createServer(handler);
 
   wsLayer = createWsLayer({ httpServer, runner, wledStore });
+  wledStore.setOnChange(() => wsLayer?.broadcastHello());
 
   const port = await listenWalking(httpServer, cfg.httpPort, cfg.httpPortMaxWalk);
   log.info('http+ws listening', { port });

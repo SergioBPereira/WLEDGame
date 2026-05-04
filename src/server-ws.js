@@ -21,8 +21,11 @@ export function createWsLayer({ httpServer, runner, wledStore }) {
         id: w.id, name: w.name || w.host, host: w.host,
         ledCount: w.ledCount, online: w.online,
       })),
+      bests: runner.bests?.() ?? [],
     };
   }
+
+  function broadcastHello() { broadcast(helloFor()); }
 
   function broadcastFrame(rgbBuf) {
     if (!rgbBuf) return;
@@ -43,6 +46,7 @@ export function createWsLayer({ httpServer, runner, wledStore }) {
     ws.wantsPreview = false;
     ws.send(JSON.stringify(helloFor()));
     ws.send(JSON.stringify(runner.snapshot()));
+    wledStore.maybeReprobe?.().catch(() => {});
 
     ws.on('message', async (raw) => {
       let m;
@@ -65,6 +69,7 @@ export function createWsLayer({ httpServer, runner, wledStore }) {
           }
         } else if (m.type === 'hello') {
           ws.send(JSON.stringify(helloFor()));
+          wledStore.maybeReprobe?.().catch(() => {});
         } else if (m.type === 'preview') {
           ws.wantsPreview = m.enabled;
         }
@@ -78,5 +83,5 @@ export function createWsLayer({ httpServer, runner, wledStore }) {
     ws.on('error', () => clients.delete(ws));
   });
 
-  return { broadcast, broadcastFrame, helloFor };
+  return { broadcast, broadcastFrame, helloFor, broadcastHello };
 }

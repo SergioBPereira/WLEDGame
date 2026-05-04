@@ -11,7 +11,7 @@ const TYPES = {
   '.json': 'application/json; charset=utf-8',
 };
 
-export function createHttpHandler({ publicDir, getApiState, getApiWleds }) {
+export function createHttpHandler({ publicDir, getApiState, getApiWleds, getApiConfig, onClientHit }) {
   return function handler(req, res) {
     if (req.method !== 'GET') { res.statusCode = 405; res.end(); return; }
     const url = req.url || '/';
@@ -22,10 +22,17 @@ export function createHttpHandler({ publicDir, getApiState, getApiWleds }) {
       return;
     }
     if (url === '/api/wleds') {
+      onClientHit?.();
       res.setHeader('content-type', TYPES['.json']);
       res.end(JSON.stringify(getApiWleds()));
       return;
     }
+    if (url === '/api/config') {
+      res.setHeader('content-type', TYPES['.json']);
+      res.end(JSON.stringify(getApiConfig?.() ?? {}));
+      return;
+    }
+    if (url === '/' || url === '/index.html') onClientHit?.();
     let p = url === '/' ? '/index.html' : url;
     p = p.split('?')[0].split('#')[0];
     p = normalize(p).replace(/^[\\/]+/, '');

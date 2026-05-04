@@ -47,7 +47,14 @@ export function createGameState({ ledCount, fireZoneLeds }) {
     fireZoneVirtualSize: 1000 * fireZoneLeds / ledCount,
     nextId: makeIdGen(),
     overUntilTs: 0,
+    deepestPos: 0, // virtual coord, [0..1000] — high-water-mark for the round
   };
+}
+
+// Update the round's HWM from the current cluster set.
+// Call after each advance/spawn cycle.
+export function updateDeepestPos(gs) {
+  for (const c of gs.clusters) if (c.pos > gs.deepestPos) gs.deepestPos = c.pos;
 }
 
 export function spawnEnemy(gs, color) {
@@ -56,6 +63,32 @@ export function spawnEnemy(gs, color) {
     pos: 0,
     heads: [{ mask: maskFromColor(color), hits: 0 }],
   });
+}
+
+// Boss types: 'masterblaster' (color-cycle), 'tank' (any color, immune to stuck), 'overlord' (cycle + minions).
+// Bosses live on the same cluster track but skip the heads model — collisions consult the boss block.
+export function spawnBoss(gs, def, now = Date.now()) {
+  gs.clusters.push({
+    id: gs.nextId(),
+    pos: 0,
+    heads: [{ mask: 7, hits: 0 }], // dummy; boss path is taken in resolveCollisions
+    boss: {
+      type: def.type,
+      hp: def.hp,
+      maxHp: def.hp,
+      cycleMs: def.cycleMs || 0,
+      startedAt: now,
+      minionEveryMs: def.minionEveryMs || 0,
+      lastMinionAt: now,
+    },
+  });
+}
+
+export function bossCurrentMask(boss, now = Date.now()) {
+  if (boss.type === 'tank') return 7;        // accepts any color
+  if (!boss.cycleMs || boss.cycleMs <= 0) return 7;
+  const ph = Math.floor((now - boss.startedAt) / boss.cycleMs) % 3;
+  return [1, 2, 4][ph]; // R, G, B
 }
 
 export function advanceEntities(gs, dtSec, enemyUnitsPerSec, shotUnitsPerSec) {
@@ -71,7 +104,7 @@ export function advanceEntities(gs, dtSec, enemyUnitsPerSec, shotUnitsPerSec) {
 
 const SWEEP_PAD = 4.0;  // covers cluster motion within the same frame + numerical jitter
 
-export function resolveCollisions(gs, wrongColorMode) {
+export function resolveCollisions(gs, wrongColorMode, now = Date.now()) {
   const events = [];
   const ledStep = 1000 / gs.ledCount;
   const sortedClusters = [...gs.clusters].sort((a, b) => b.pos - a.pos);
@@ -82,6 +115,30 @@ export function resolveCollisions(gs, wrongColorMode) {
     const hi = (shot.prevPos ?? shot.pos) + SWEEP_PAD;
     const target = sortedClusters.find(c => c.pos >= lo && c.pos <= hi);
     if (!target) continue;
+
+    // Boss path: ignore heads model, consult boss block.
+    if (target.boss) {
+      const cBit = maskFromColor(shot.color);
+      const bossMask = bossCurrentMask(target.boss, now);
+      const accepts = target.boss.type === 'tank' || (cBit & bossMask) !== 0;
+      gs.shots = gs.shots.filter(s => s.id !== shot.id);
+      if (accepts) {
+        target.boss.hp -= 1;
+        gs.score += 1;
+        if (target.boss.hp <= 0) {
+          const award = target.boss.maxHp; // bonus on full defeat
+          gs.score += award;
+          gs.clusters = gs.clusters.filter(c => c.id !== target.id);
+          events.push({ type: 'bossDefeated', bossType: target.boss.type, scoreDelta: 1 + award });
+        } else {
+          events.push({ type: 'bossHit', bossType: target.boss.type, color: shot.color, hp: target.boss.hp, maxHp: target.boss.maxHp, scoreDelta: 1 });
+        }
+      } else {
+        // Wrong color on a boss is always 'consumed' (bosses are immune to stuck).
+        events.push({ type: 'miss', color: shot.color });
+      }
+      continue;
+    }
 
     const headRec = target.heads[0];
     const cBit = maskFromColor(shot.color);
@@ -122,13 +179,48 @@ export function startRound(gs, opts) {
   gs.score = 0;
   gs.clusters = [];
   gs.shots = [];
+  gs.deepestPos = 0;
   gs.wrongColorMode = opts.wrongColorMode;
   gs.kidsMode = !!opts.kidsMode;
   gs.wEnemies = !!opts.wEnemies;
+  gs.endless = !!opts.endless;
+  gs.tunnelsEnabled = !!opts.tunnels;
+  gs.tunnelBase = opts.tunnels ? pickTunnelBase(gs.ledCount, gs.fireZoneLeds) : null;
+  gs.tunnels = []; // recomputed per level once playing
   gs.wledId = opts.wledId;
   gs.background = opts.background;
   gs.brightness = opts.brightness ?? 70;
   gs.startedAt = Date.now();
+  gs.transitionUntilTs = 0;
+  gs.transitionStartedAt = 0;
+  gs.transitionKind = null;
+}
+
+// Tunnel base position is picked ONCE per round, after the first 33% of the
+// strip and leaving room for the maximum (15%) tunnel size before the fire zone.
+// Size grows with each level — see tunnelsForLevel().
+export function pickTunnelBase(ledCount, fireZoneLeds, rng = Math.random) {
+  const maxSize = Math.max(1, Math.floor(ledCount * 0.15));
+  const minBase = Math.floor(ledCount * 0.33);
+  const maxBase = Math.max(minBase, ledCount - fireZoneLeds - maxSize);
+  return Math.floor(minBase + rng() * (maxBase - minBase + 1));
+}
+
+// Per-level tunnel extent: starts at 5% of ledCount on level idx 0, grows by
+// 1 LED per level, capped at 15% of ledCount, never crossing the fire zone.
+// Returns a single-element tunnel array (or [] when tunnels are disabled).
+export function tunnelsForLevel(gs, levelIdx) {
+  if (!gs.tunnelsEnabled || gs.tunnelBase == null) return [];
+  const ledCount = gs.ledCount;
+  const fireZoneLeds = gs.fireZoneLeds;
+  const startSize = Math.max(1, Math.floor(ledCount * 0.05));
+  const maxSize   = Math.max(startSize, Math.floor(ledCount * 0.15));
+  const grown     = startSize + Math.max(0, levelIdx);
+  const size      = Math.min(maxSize, grown);
+  const start = gs.tunnelBase;
+  const end   = Math.min(ledCount - fireZoneLeds - 1, start + size - 1);
+  const TUNNEL_BROWN = '#4a2810';
+  return [{ startLed: start, endLed: end, color: TUNNEL_BROWN, brightness: 0.18, _rgb: [0x4a, 0x28, 0x10] }];
 }
 
 export function gameOver(gs, cooldownMs, nowFn = Date.now) {
@@ -144,10 +236,30 @@ export function checkGameOver(gs) {
   return false;
 }
 
-export function renderEntities(gs) {
+export function renderEntities(gs, now = Date.now()) {
   const out = [];
   const step = 1000 / gs.ledCount;
   for (const c of gs.clusters) {
+    if (c.boss) {
+      // Render boss as a 3-LED-wide block in its current accepts-color.
+      const mask = bossCurrentMask(c.boss, now);
+      const rgb = maskRgb(mask);
+      // Subtle HP glow: dim toward dark red as hp drops.
+      const hpFrac = c.boss.hp / c.boss.maxHp;
+      const dimmed = [
+        Math.floor(rgb[0] * (0.55 + 0.45 * hpFrac)),
+        Math.floor(rgb[1] * (0.55 + 0.45 * hpFrac)),
+        Math.floor(rgb[2] * (0.55 + 0.45 * hpFrac)),
+      ];
+      for (let i = 0; i < 3; i++) {
+        out.push({
+          id: `${c.id}:${i}`,
+          pos: Math.max(0, c.pos - i * step),
+          rgb: dimmed,
+        });
+      }
+      continue;
+    }
     for (let i = 0; i < c.heads.length; i++) {
       out.push({
         id: `${c.id}:${i}`,

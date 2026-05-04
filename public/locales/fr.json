@@ -1,0 +1,51 @@
+{
+  "app.title": "WLED Game",
+  "app.subtitle": "Vise les lumières avec la bonne couleur avant qu'elles n'atteignent le feu.",
+
+  "start.label.wled":         "WLED",
+  "start.label.wrongColor":   "Mauvaise couleur",
+  "start.label.kids":         "Mode enfants",
+  "start.label.wEnemies":     "Ennemis W",
+  "start.label.mode":         "Mode",
+  "start.label.background":   "Fond",
+  "start.label.tunnels":      "Tunnels",
+  "start.label.preview":      "Aperçu",
+  "start.label.lang":         "Langue",
+
+  "start.opt.consumed":  "Consommé",
+  "start.opt.stuck":     "Bloqué devant",
+  "start.opt.no":        "Non",
+  "start.opt.yes":       "Oui",
+  "start.opt.off":       "Off",
+  "start.opt.on":        "On",
+  "start.opt.campaign":  "Campagne",
+  "start.opt.endless":   "Infini",
+  "start.opt.solid":     "Uni",
+  "start.opt.breathe":   "Respiration",
+
+  "start.button":        "COMMENCER",
+  "start.best":          "Record",
+  "start.bestNone":      "aucun record",
+  "start.bestNew":       "nouveau record !",
+
+  "wled.ledsSuffix":     "LEDs",
+  "wled.offline":        "hors ligne",
+
+  "over.title.gameOver": "PARTIE TERMINÉE",
+  "over.title.victory":  "VICTOIRE !",
+  "over.score":          "Score",
+  "over.again":          "Rejouer",
+  "over.cooldown":       "Attendre {{seconds}} s…",
+
+  "level.regular":       "Niveau {{n}}",
+  "level.boss1":         "Boss : Masterblaster",
+  "level.boss2":         "Boss : Le Tank",
+  "level.boss3":         "Boss : Suzerain RGB",
+  "level.endless":       "Infini",
+
+  "overlay.bossDown":    "BOSS VAINCU",
+  "overlay.victory":     "VICTOIRE",
+  "overlay.endlessMode": "MODE INFINI",
+
+  "err.wledUnreachable": "WLED injoignable."
+}

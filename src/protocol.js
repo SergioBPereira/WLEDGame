@@ -33,7 +33,9 @@ export function parseClientMessage(raw) {
       if (bg.mode !== 'off') {
         if (typeof bg.color !== 'string' || !/^#[0-9a-fA-F]{6}$/.test(bg.color)) bad('start.background.color');
       }
-      return { type: 'start', wledId: m.wledId, wrongColorMode: m.wrongColorMode, kidsMode, wEnemies, background: bg };
+      const endless = !!m.endless;
+      const tunnels = !!m.tunnels;
+      return { type: 'start', wledId: m.wledId, wrongColorMode: m.wrongColorMode, kidsMode, wEnemies, endless, tunnels, background: bg };
     }
     case 'preview': {
       return { type: 'preview', enabled: !!m.enabled };

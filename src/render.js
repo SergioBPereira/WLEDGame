@@ -71,6 +71,75 @@ export function renderFireZone(frame, ledCount, fireZoneLeds, t) {
   }
 }
 
+// "Danger signal": warm pulsing pixel marking how far any enemy got this round.
+// Pulses at ~1Hz so the player notices it without it being noisy. Additive over
+// background; clamped to never paint into the fire zone.
+export function renderHighWaterMark(frame, virtualPos, ledCount, fireZoneLeds, t = 0) {
+  if (virtualPos == null || virtualPos <= 0) return;
+  const lastNonFire = ledCount - fireZoneLeds;
+  const physF = virtualPos * ledCount / 1000;
+  const i = Math.min(lastNonFire - 1, Math.max(0, Math.floor(physF)));
+  const pulse = 0.5 + 0.5 * Math.sin(t * 2 * Math.PI); // ~1Hz, full breath in 1s
+  const r = Math.floor(220 * pulse);
+  const g = Math.floor(45  * pulse);
+  const b = Math.floor(15  * pulse);
+  frame[i*3 + 0] = Math.min(255, frame[i*3 + 0] + r);
+  frame[i*3 + 1] = Math.min(255, frame[i*3 + 1] + g);
+  frame[i*3 + 2] = Math.min(255, frame[i*3 + 2] + b);
+}
+
+// Tunnels: per-WLED occlusion regions configured in wleds.json.
+// Each tunnel paints a fixed dim color over its LEDs and is rendered AFTER
+// entities so it covers them visually (entities still exist + collide).
+export function renderTunnels(frame, tunnels, ledCount, fireZoneLeds) {
+  if (!tunnels || tunnels.length === 0) return;
+  const lastNonFire = ledCount - fireZoneLeds;
+  for (const t of tunnels) {
+    const start = Math.max(0, t.startLed);
+    const end   = Math.min(lastNonFire - 1, t.endLed); // never overlap fire zone
+    const [r, g, b] = t._rgb; // pre-parsed
+    const mul = t.brightness ?? 0.10;
+    for (let i = start; i <= end; i++) {
+      frame[i*3 + 0] = Math.floor(r * mul);
+      frame[i*3 + 1] = Math.floor(g * mul);
+      frame[i*3 + 2] = Math.floor(b * mul);
+    }
+  }
+}
+
+export function isInTunnel(virtualPos, tunnels, ledCount) {
+  if (!tunnels || tunnels.length === 0) return false;
+  const physF = virtualPos * ledCount / 1000;
+  const i = Math.floor(physF);
+  for (const t of tunnels) if (i >= t.startLed && i <= t.endLed) return true;
+  return false;
+}
+
+// Whole-strip pulse used during the levelTransition phase.
+// Color is keyed to the transition kind: cyan for normal, amber for boss,
+// magenta for endless. The fire zone stays dark so the next round still has
+// the strip's visual reference.
+const TRANSITION_COLORS = {
+  normal:  [ 92, 220, 255], // cyan
+  boss:    [255, 174,  59], // amber
+  endless: [217, 122, 255], // magenta
+};
+export function renderTransitionFrame({ ledCount, fireZoneLeds, elapsedSec, kind, brightness }) {
+  const f = newFrame(ledCount);
+  const [r, g, b] = TRANSITION_COLORS[kind] || TRANSITION_COLORS.normal;
+  // Sweep from low to high to low across the ~1.5s window — one full breath.
+  const phase = Math.min(1, Math.max(0, elapsedSec / 1.5));
+  const pulse = 0.20 + 0.80 * Math.sin(phase * Math.PI); // 0..1..0
+  const lastNonFire = ledCount - fireZoneLeds;
+  for (let i = 0; i < lastNonFire; i++) {
+    f[i*3 + 0] = Math.floor(r * pulse);
+    f[i*3 + 1] = Math.floor(g * pulse);
+    f[i*3 + 2] = Math.floor(b * pulse);
+  }
+  applyBrightness(f, brightness);
+  return f;
+}
+
 export function applyBrightness(frame, value0to100) {
   const k = value0to100 / 100;
   for (let i = 0; i < frame.length; i++) {
@@ -78,14 +147,20 @@ export function applyBrightness(frame, value0to100) {
   }
 }
 
-export function renderFrame({ ledCount, t, background, entities, leadId, brightness, cfg }) {
+export function renderFrame({ ledCount, t, background, entities, leadId, brightness, cfg, deepestPos, tunnels }) {
   const frame = newFrame(ledCount);
   const fireZoneLeds = cfg.fireZoneLeds;
   renderBackground(frame, background, ledCount, fireZoneLeds, t, cfg.render);
+  renderHighWaterMark(frame, deepestPos, ledCount, fireZoneLeds, t);
   renderFireZone(frame, ledCount, fireZoneLeds, t);
   for (const e of entities) {
-    renderEntity(frame, e.pos, e.rgb, ledCount, e.id === leadId, t, cfg.render);
+    // Suppress lead emphasis when the lead is hiding inside a tunnel.
+    const isLead = e.id === leadId && !isInTunnel(e.pos, tunnels, ledCount);
+    renderEntity(frame, e.pos, e.rgb, ledCount, isLead, t, cfg.render);
   }
+  // Tunnels paint LAST over the entity layer so occluded entities are masked
+  // by the tunnel's fixed color (per spec: "not drawn — but they still exist").
+  renderTunnels(frame, tunnels, ledCount, fireZoneLeds);
   applyBrightness(frame, brightness);
   return frame;
 }

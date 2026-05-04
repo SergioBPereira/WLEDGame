@@ -14,22 +14,48 @@ export function createWledStore({ wleds, stateDir }) {
     if (!existsSync(stateDir)) await mkdir(stateDir, { recursive: true });
   }
 
-  async function probeAll(timeoutMs = 1500) {
-    const tasks = [];
-    for (const w of byId.values()) {
-      tasks.push(probeInfo(w, timeoutMs).then(info => {
-        w.name = w.name || info.name;
-        w.ledCount = info.ledCount;
-        w.udpPort = info.udpPort || w.udpPort;
-        w.online = true;
-        log.info('wled probed', { id: w.id, name: w.name, leds: w.ledCount });
-      }).catch(err => {
-        w.online = false;
-        w.lastError = String(err.message || err);
-        log.warn('wled probe failed', { id: w.id, error: w.lastError });
-      }));
+  async function probeOne(w, timeoutMs) {
+    try {
+      const info = await probeInfo(w, timeoutMs);
+      w.name = w.name || info.name;
+      w.ledCount = info.ledCount;
+      w.udpPort = info.udpPort || w.udpPort;
+      w.online = true;
+      log.info('wled probed', { id: w.id, name: w.name, leds: w.ledCount });
+    } catch (err) {
+      w.online = false;
+      w.lastError = String(err.message || err);
+      log.warn('wled probe failed', { id: w.id, error: w.lastError });
     }
-    await Promise.allSettled(tasks);
+  }
+
+  async function probeAll(timeoutMs = 1500) {
+    await Promise.allSettled([...byId.values()].map(w => probeOne(w, timeoutMs)));
+  }
+
+  let lastReprobeAt = 0;
+  let inFlightReprobe = null;
+  let onChange = null;
+  function setOnChange(fn) { onChange = fn; }
+
+  function maybeReprobe({ minIntervalMs = 10000, timeoutMs = 1500 } = {}) {
+    if (inFlightReprobe) return inFlightReprobe;
+    const offline = [...byId.values()].filter(w => !w.online);
+    if (offline.length === 0) return Promise.resolve({ ran: false, changed: false });
+    const now = Date.now();
+    if (now - lastReprobeAt < minIntervalMs) return Promise.resolve({ ran: false, changed: false });
+    lastReprobeAt = now;
+    log.info('reprobing offline wleds', { ids: offline.map(w => w.id) });
+    inFlightReprobe = (async () => {
+      await Promise.allSettled(offline.map(w => probeOne(w, timeoutMs)));
+      const changed = offline.some(w => w.online);
+      inFlightReprobe = null;
+      if (changed && onChange) {
+        try { onChange(); } catch (e) { log.warn('onChange handler error', { error: String(e.message || e) }); }
+      }
+      return { ran: true, changed };
+    })();
+    return inFlightReprobe;
   }
 
   async function recoverFromCrash() {
@@ -81,5 +107,5 @@ export function createWledStore({ wleds, stateDir }) {
   function get(id) { return byId.get(id); }
   function list() { return [...byId.values()]; }
 
-  return { probeAll, recoverFromCrash, saveStateFor, restoreStateFor, get, list };
+  return { probeAll, maybeReprobe, setOnChange, recoverFromCrash, saveStateFor, restoreStateFor, get, list };
 }

@@ -2,140 +2,688 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+  <meta name="theme-color" content="#0a0d1a">
   <title>WLED Game</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=Rubik:wght@400;500;600&family=JetBrains+Mono:wght@600;800&display=swap">
   <style>
-    :root { color-scheme: dark; }
+    :root {
+      color-scheme: dark;
+      --bg-0: #06070d;
+      --bg-1: #0c1024;
+      --bg-2: #131734;
+      --surface-low:  rgba(255,255,255,0.04);
+      --surface-mid:  rgba(255,255,255,0.08);
+      --surface-high: rgba(255,255,255,0.14);
+      --border:       rgba(255,255,255,0.10);
+      --border-strong:rgba(255,255,255,0.20);
+      --text:   #f4f6ff;
+      --muted:  #8c95b8;
+      --dim:    #5b6182;
+      --accent:        #5cdcff;   /* electric cyan */
+      --accent-hot:    #ff4dd2;   /* magenta */
+      --accent-warm:   #ffb53b;   /* amber */
+      --col-R: #ff4d6d;
+      --col-G: #4dff8a;
+      --col-B: #5db1ff;
+      --boss:   #ffae3b;
+      --endless:#d97aff;
+      --danger: #ff5577;
+
+      --font-display: 'Chakra Petch', system-ui, sans-serif;
+      --font-body:    'Rubik', system-ui, sans-serif;
+      --font-mono:    'JetBrains Mono', ui-monospace, monospace;
+
+      --r-sm: 10px;
+      --r-md: 16px;
+      --r-lg: 22px;
+
+      --shadow-card: 0 18px 40px -16px rgba(0,0,0,0.7), 0 1px 0 rgba(255,255,255,0.04) inset;
+      --glow-cyan:    0 0 28px rgba(92,220,255,0.45);
+    }
+
     * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-    html, body { margin: 0; height: 100%; background: #000; color: #eee;
-                  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
-    body { display: flex; flex-direction: column; overflow: hidden; }
-    .screen { flex: 1; display: none; flex-direction: column; padding: 16px; gap: 16px; }
-    .screen.active { display: flex; }
-    h1 { font-size: 2rem; margin: 0; }
-    .row { display: flex; gap: 12px; align-items: center; }
-    select, input[type=color] { background: #222; color: #eee; border: 1px solid #444;
-        padding: 10px; font-size: 1rem; border-radius: 6px; }
-    button { background: #335; color: #eee; border: 0; padding: 14px 18px;
-        font-size: 1.05rem; border-radius: 8px; cursor: pointer; }
+    html, body {
+      margin: 0; height: 100%;
+      color: var(--text);
+      font-family: var(--font-body);
+      font-feature-settings: 'ss01', 'cv11';
+      background: var(--bg-0);
+    }
+
+    /* Layered backdrop: deep color base + radial glows + grid + scanlines. */
+    body {
+      display: flex; flex-direction: column; overflow: hidden;
+      position: relative;
+      background:
+        radial-gradient(1100px 700px at 12% 110%, rgba(255, 77, 210, 0.18), transparent 60%),
+        radial-gradient(900px 700px at 100% -10%, rgba(92, 220, 255, 0.18), transparent 60%),
+        radial-gradient(700px 500px at 50% 50%, rgba(217, 122, 255, 0.06), transparent 70%),
+        linear-gradient(180deg, var(--bg-1), var(--bg-0));
+    }
+    body::before, body::after { content: ''; position: fixed; inset: 0; pointer-events: none; }
+    body::before {
+      background-image:
+        linear-gradient(rgba(255,255,255,0.04) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,0.04) 1px, transparent 1px);
+      background-size: 36px 36px;
+      mask-image: radial-gradient(ellipse at center, #000 35%, transparent 90%);
+      -webkit-mask-image: radial-gradient(ellipse at center, #000 35%, transparent 90%);
+      opacity: 0.45;
+    }
+    body::after {
+      background: repeating-linear-gradient(
+        0deg, rgba(255,255,255,0.02) 0 1px, transparent 1px 3px);
+      mix-blend-mode: overlay;
+      opacity: 0.6;
+    }
+
+    .screen {
+      flex: 1; display: none; flex-direction: column;
+      padding: max(16px, env(safe-area-inset-top, 0px) + 8px) 18px max(18px, env(safe-area-inset-bottom, 0px) + 12px);
+      gap: 16px; min-height: 0;
+      position: relative; z-index: 1;
+    }
+    .screen.active { display: flex; animation: screen-in 280ms cubic-bezier(0.2, 0.8, 0.2, 1); }
+    @keyframes screen-in {
+      from { opacity: 0; transform: translateY(6px); }
+      to   { opacity: 1; transform: none; }
+    }
+
+    /* ────────── Brand header on start screen ────────── */
+    .brand { display: flex; flex-direction: column; gap: 6px; padding-top: 6px; }
+    .brand-row { display: flex; align-items: center; gap: 12px; }
+    .brand-mark {
+      width: 36px; height: 36px; flex: 0 0 36px; position: relative;
+      filter: drop-shadow(0 0 10px rgba(92,220,255,0.6));
+    }
+    .brand-mark::before, .brand-mark::after, .brand-mark > i {
+      content: ''; position: absolute; width: 18px; height: 18px; border-radius: 50%;
+    }
+    .brand-mark::before { background: var(--col-R); top: 0; left: 4px;  mix-blend-mode: screen; }
+    .brand-mark::after  { background: var(--col-G); top: 14px; left: 14px; mix-blend-mode: screen; }
+    .brand-mark > i     { background: var(--col-B); top: 4px; left: 22px;  mix-blend-mode: screen; display: block; }
+    h1 {
+      font-family: var(--font-display); font-weight: 700;
+      font-size: 1.7rem; margin: 0; letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+    .brand p {
+      margin: 4px 0 0; color: var(--muted); font-size: 0.92rem; line-height: 1.45;
+      max-width: 38ch;
+    }
+
+    /* ────────── Settings card ────────── */
+    .card {
+      background: linear-gradient(180deg, rgba(20,24,46,0.7), rgba(8,10,22,0.55));
+      border: 1px solid var(--border);
+      border-radius: var(--r-lg);
+      padding: 14px; display: flex; flex-direction: column; gap: 12px;
+      box-shadow: var(--shadow-card);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+    }
+    .row { display: flex; gap: 10px; align-items: center; min-height: 44px; }
+    .row > label {
+      flex: 0 0 6.4em; color: var(--muted); font-size: 0.82rem; letter-spacing: 0.04em;
+      text-transform: uppercase; font-weight: 500;
+    }
+
+    select {
+      flex: 1; appearance: none; -webkit-appearance: none;
+      background: var(--surface-low); color: var(--text);
+      border: 1px solid var(--border); border-radius: var(--r-sm);
+      padding: 10px 36px 10px 12px; font-size: 0.95rem; font-family: var(--font-body);
+      background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8' fill='none'><path d='M1 1.5l5 5 5-5' stroke='%238c95b8' stroke-width='1.5' stroke-linecap='round'/></svg>");
+      background-repeat: no-repeat;
+      background-position: right 12px center;
+    }
+
+    input[type=color] {
+      background: var(--surface-low); border: 1px solid var(--border);
+      padding: 4px; border-radius: var(--r-sm); height: 44px; width: 100%;
+    }
+
+    /* ────────── Buttons (base) ────────── */
+    button {
+      background: var(--surface-mid); color: var(--text);
+      border: 1px solid var(--border);
+      padding: 12px 16px; font-size: 0.95rem; font-family: var(--font-body); font-weight: 500;
+      border-radius: var(--r-sm); cursor: pointer;
+      transition: transform 80ms ease, background 160ms ease, color 160ms ease, box-shadow 160ms ease, border-color 160ms ease;
+    }
     button:active { transform: scale(0.97); }
-    button[disabled] { opacity: 0.4; cursor: not-allowed; }
-    .start-btn { font-size: 1.4rem; padding: 18px; background: #2a7; }
-    .top { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-    .score { font-size: 2.4rem; font-weight: 700; }
-    .conn { width: 14px; height: 14px; border-radius: 50%; background: #2a7; }
-    .conn.reconnecting { background: orange; animation: pulse 1s infinite; }
-    @keyframes pulse { 50% { opacity: 0.4; } }
-    .bri { flex: 1; max-width: 220px; display: flex; align-items: center; gap: 8px; }
-    .bri input { flex: 1; }
-    .pad { flex: 1; display: flex; gap: 8px; }
-    .btn-color { flex: 1; border-radius: 14px; transition: filter 100ms, transform 100ms; }
-    .btn-color:active { filter: brightness(0.7); transform: scale(0.95); }
-    .btn-R { background: #d22; } .btn-G { background: #2c4; } .btn-B { background: #36e; }
-    .btn-color.flash { animation: flash 200ms; }
-    .btn-color.flash-bad { animation: flash-bad 250ms; }
-    @keyframes flash { 0% { filter: brightness(2.0); } 100% { filter: none; } }
-    @keyframes flash-bad { 0%, 100% { box-shadow: 0 0 0 0 #f44; } 50% { box-shadow: 0 0 0 6px #f44; } }
-    .picker { display: flex; gap: 6px; }
-    .picker button { flex: 1; }
-    .picker button.selected { outline: 2px solid #fff; }
-    .swatches { display: grid; grid-template-columns: repeat(8, 1fr); gap: 6px; margin-top: 6px; }
-    .swatch { aspect-ratio: 1/1; border-radius: 6px; cursor: pointer; border: 2px solid transparent; }
-    .swatch.selected { border-color: #fff; }
-    .over h1 { font-size: 3rem; }
-    .over .score-big { font-size: 4rem; font-weight: 700; }
+    button[disabled] { opacity: 0.35; cursor: not-allowed; transform: none; }
+
+    /* ────────── Segmented picker ────────── */
+    .picker {
+      display: flex; gap: 4px; padding: 4px;
+      background: var(--surface-low); border: 1px solid var(--border);
+      border-radius: 12px;
+    }
+    .picker button {
+      flex: 1; padding: 9px 10px; font-size: 0.88rem; font-weight: 500;
+      background: transparent; color: var(--muted); border: 0;
+      letter-spacing: 0.03em;
+    }
+    .picker button.selected {
+      background: linear-gradient(180deg, rgba(92,220,255,0.18), rgba(92,220,255,0.04));
+      color: var(--text);
+      box-shadow: 0 6px 16px -8px rgba(92,220,255,0.45), 0 0 0 1px rgba(92,220,255,0.35) inset;
+    }
+
+    .swatches { display: grid; grid-template-columns: repeat(8, 1fr); gap: 6px; margin-top: 8px; }
+    .swatch {
+      aspect-ratio: 1/1; border-radius: 8px; cursor: pointer;
+      border: 2px solid transparent; transition: transform 120ms;
+    }
+    .swatch.selected { border-color: var(--accent); transform: scale(1.06); }
+
+    /* ────────── Primary CTA (START / RETRY) ────────── */
+    .start-btn {
+      font-family: var(--font-display); font-weight: 700; font-size: 1.25rem;
+      letter-spacing: 0.18em; text-transform: uppercase;
+      padding: 18px; border-radius: var(--r-md);
+      color: #021018;
+      background: linear-gradient(135deg, #5cdcff 0%, #8a7dff 100%);
+      border: 0;
+      box-shadow:
+        0 18px 40px -10px rgba(92,220,255,0.55),
+        0 0 0 1px rgba(255,255,255,0.18) inset;
+      position: relative; overflow: hidden;
+    }
+    .start-btn::after {
+      content: ''; position: absolute; inset: 0;
+      background: linear-gradient(120deg, transparent 30%, rgba(255,255,255,0.35) 50%, transparent 70%);
+      transform: translateX(-100%);
+      transition: transform 600ms;
+    }
+    .start-btn:hover::after { transform: translateX(100%); }
+
+    /* ────────── Game HUD ────────── */
+    #screen-game { padding-top: max(12px, env(safe-area-inset-top, 0px) + 4px); position: relative; }
+
+    .hud {
+      display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 12px;
+    }
+    .hud-meta { display: flex; align-items: center; gap: 8px; }
+    .level-badge {
+      font-family: var(--font-display); font-weight: 700; font-size: 0.78rem;
+      padding: 5px 11px; border-radius: 8px;
+      background: rgba(92,220,255,0.12); color: var(--accent);
+      letter-spacing: 0.12em; text-transform: uppercase;
+      border: 1px solid rgba(92,220,255,0.4);
+      box-shadow: 0 0 18px -2px rgba(92,220,255,0.45);
+      min-width: 3.4em; text-align: center;
+      clip-path: polygon(8px 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%, 0 8px);
+    }
+    .level-badge.boss {
+      background: rgba(255,174,59,0.12); color: var(--boss);
+      border-color: rgba(255,174,59,0.45);
+      box-shadow: 0 0 18px -2px rgba(255,174,59,0.5);
+    }
+    .level-badge.endless {
+      background: rgba(217,122,255,0.14); color: var(--endless);
+      border-color: rgba(217,122,255,0.45);
+      box-shadow: 0 0 18px -2px rgba(217,122,255,0.55);
+    }
+
+    .score {
+      font-family: var(--font-mono); font-weight: 800;
+      font-variant-numeric: tabular-nums;
+      font-size: clamp(2.4rem, 9vw, 3.4rem); line-height: 1; letter-spacing: -0.02em;
+      color: var(--text);
+      text-shadow: 0 0 18px rgba(92,220,255,0.35);
+      text-align: center; min-width: 0;
+    }
+
+    .conn {
+      width: 12px; height: 12px; border-radius: 50%;
+      background: var(--col-G);
+      box-shadow: 0 0 12px var(--col-G);
+    }
+    .conn.reconnecting { background: var(--accent-warm); box-shadow: 0 0 12px var(--accent-warm); animation: pulse 1.1s infinite; }
+    @keyframes pulse { 50% { opacity: 0.35; } }
+
+    .bri-bar {
+      display: flex; align-items: center; gap: 10px;
+      padding: 8px 14px; border-radius: 999px;
+      background: var(--surface-low); border: 1px solid var(--border);
+    }
+    .bri-bar .bri-icon { color: var(--muted); font-size: 0.95rem; }
+    .bri-bar input[type=range] {
+      flex: 1; -webkit-appearance: none; appearance: none;
+      height: 4px; border-radius: 999px;
+      background: linear-gradient(90deg, var(--accent) 0%, var(--accent-hot) 100%);
+      opacity: 0.85;
+    }
+    .bri-bar input[type=range]::-webkit-slider-thumb {
+      -webkit-appearance: none; appearance: none;
+      width: 18px; height: 18px; border-radius: 50%;
+      background: #fff; border: 0; box-shadow: 0 0 0 4px rgba(255,255,255,0.12);
+    }
+    .bri-bar input[type=range]::-moz-range-thumb {
+      width: 18px; height: 18px; border-radius: 50%;
+      background: #fff; border: 0; box-shadow: 0 0 0 4px rgba(255,255,255,0.12);
+    }
+    .bri-bar #bri-val {
+      color: var(--muted); font-family: var(--font-mono); font-size: 0.78rem;
+      font-variant-numeric: tabular-nums; min-width: 2.6em; text-align: right;
+    }
+
+    .boss-banner {
+      display: none;
+      align-items: center; justify-content: center; gap: 8px;
+      padding: 8px 14px; border-radius: 12px;
+      background: linear-gradient(180deg, rgba(255,174,59,0.18), rgba(255,174,59,0.04));
+      border: 1px solid rgba(255,174,59,0.45);
+      box-shadow: 0 0 24px -6px rgba(255,174,59,0.55);
+      font-family: var(--font-display); font-weight: 700; font-size: 0.82rem;
+      letter-spacing: 0.16em; text-transform: uppercase; color: var(--boss);
+      animation: boss-pulse 2.4s ease-in-out infinite;
+    }
+    .boss-banner.show { display: flex; }
+    @keyframes boss-pulse {
+      0%, 100% { box-shadow: 0 0 24px -6px rgba(255,174,59,0.45); }
+      50%      { box-shadow: 0 0 36px -2px rgba(255,174,59,0.85); }
+    }
+    .boss-banner .boss-skull { font-size: 1rem; line-height: 1; }
+
+    .hp-bar {
+      height: 8px; background: var(--surface-low); border: 1px solid var(--border);
+      border-radius: 999px; overflow: hidden; display: none; position: relative;
+    }
+    .hp-bar > i {
+      display: block; height: 100%;
+      background: linear-gradient(90deg, var(--col-R), var(--accent-warm) 60%, #fff5);
+      transition: width 140ms ease;
+      box-shadow: 0 0 12px rgba(255,77,109,0.7);
+    }
+
+    .game-fill { flex: 1; min-height: 0; }
+
+    /* ────────── Strip preview ────────── */
+    #strip-wrap {
+      display: none; height: 64px;
+      background: linear-gradient(180deg, #060812, #0a0d22);
+      border-radius: var(--r-md);
+      overflow: hidden; position: relative;
+      border: 1px solid var(--border);
+      box-shadow: 0 6px 20px -6px rgba(0,0,0,0.6), 0 0 0 1px rgba(92,220,255,0.06) inset;
+    }
+    #strip-canvas { image-rendering: pixelated; width: 100%; height: 100%; display: block; }
+
+    /* ────────── Color action buttons (R / G / B) ────────── */
+    .pad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; flex: 0 0 auto; }
+    .btn-color {
+      position: relative; height: 96px;
+      border-radius: 18px;
+      border: 1px solid var(--border-strong);
+      padding: 0;
+      transition: transform 90ms ease, box-shadow 160ms ease, filter 90ms ease;
+      overflow: hidden;
+      isolation: isolate;
+    }
+    .btn-color::before {
+      content: ''; position: absolute; inset: 0; z-index: -1;
+      background:
+        radial-gradient(circle at 30% 20%, rgba(255,255,255,0.35), transparent 50%),
+        var(--btn-fill);
+    }
+    .btn-color::after {
+      content: ''; position: absolute; inset: 0; border-radius: inherit;
+      background: linear-gradient(180deg, rgba(255,255,255,0.18) 0%, transparent 35%, rgba(0,0,0,0.45) 100%);
+      pointer-events: none;
+    }
+    .btn-color .btn-letter {
+      position: absolute; inset: 0; display: grid; place-items: center;
+      font-family: var(--font-display); font-weight: 700;
+      font-size: 2.4rem; letter-spacing: 0;
+      color: rgba(255,255,255,0.95);
+      text-shadow: 0 2px 0 rgba(0,0,0,0.35), 0 0 24px var(--btn-glow);
+      mix-blend-mode: screen;
+    }
+    .btn-R { --btn-fill: linear-gradient(160deg, #ff5d7d, #c91a3b); --btn-glow: rgba(255,77,109,0.7); }
+    .btn-G { --btn-fill: linear-gradient(160deg, #6dffa1, #16a04a); --btn-glow: rgba(77,255,138,0.7); }
+    .btn-B { --btn-fill: linear-gradient(160deg, #6dc8ff, #1f5ad8); --btn-glow: rgba(93,177,255,0.75); }
+    .btn-color { box-shadow: 0 12px 28px -10px var(--btn-glow), 0 0 0 1px rgba(255,255,255,0.06) inset; }
+    .btn-color:active {
+      transform: scale(0.96);
+      filter: brightness(1.25) saturate(1.1);
+      box-shadow: 0 4px 14px -4px var(--btn-glow), 0 0 0 1px rgba(255,255,255,0.18) inset;
+    }
+    .btn-color.flash { animation: flash 250ms; }
+    .btn-color.flash-bad { animation: flash-bad 320ms; }
+    @keyframes flash {
+      0%   { filter: brightness(1.9) saturate(1.3); }
+      100% { filter: none; }
+    }
+    @keyframes flash-bad {
+      0%, 100% { box-shadow: 0 12px 28px -10px var(--btn-glow), 0 0 0 0 rgba(255,77,109,0); }
+      50%      { box-shadow: 0 0 0 8px rgba(255,77,109,0.45), 0 0 24px rgba(255,77,109,0.55); }
+    }
+
+    /* ────────── Overlay (level/boss/victory banner) ────────── */
+    .overlay {
+      position: absolute; left: 16px; right: 16px; top: 30%;
+      text-align: center; pointer-events: none;
+      opacity: 0; transform: translateY(8px) scale(0.96);
+      transition: opacity 220ms ease, transform 220ms cubic-bezier(0.2, 0.9, 0.3, 1.4);
+    }
+    .overlay.show { opacity: 1; transform: none; }
+    .overlay .ot {
+      display: inline-block;
+      font-family: var(--font-display); font-weight: 700;
+      font-size: clamp(1.6rem, 7vw, 2.8rem); letter-spacing: 0.18em;
+      padding: 14px 26px; border-radius: 14px;
+      background: linear-gradient(180deg, rgba(8,12,28,0.78), rgba(8,12,28,0.55));
+      border: 1px solid rgba(92,220,255,0.45);
+      color: var(--accent);
+      text-shadow: 0 0 24px currentColor;
+      box-shadow: 0 0 60px -10px rgba(92,220,255,0.6), 0 18px 40px -16px rgba(0,0,0,0.7);
+      backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+    }
+    .overlay.boss .ot { color: var(--boss); border-color: rgba(255,174,59,0.5); box-shadow: 0 0 60px -10px rgba(255,174,59,0.6), 0 18px 40px -16px rgba(0,0,0,0.7); }
+    .overlay.victory .ot { color: #b1ffc1; border-color: rgba(77,255,138,0.5); box-shadow: 0 0 60px -10px rgba(77,255,138,0.6), 0 18px 40px -16px rgba(0,0,0,0.7); }
+    .overlay.endless .ot { color: var(--endless); border-color: rgba(217,122,255,0.5); box-shadow: 0 0 60px -10px rgba(217,122,255,0.6), 0 18px 40px -16px rgba(0,0,0,0.7); }
+
+    /* ────────── Game over screen ────────── */
+    .over-card {
+      background: linear-gradient(180deg, rgba(20,24,46,0.75), rgba(6,8,18,0.6));
+      border: 1px solid var(--border);
+      border-radius: var(--r-lg);
+      padding: 32px 22px;
+      box-shadow: var(--shadow-card);
+      text-align: center;
+      backdrop-filter: blur(14px);
+    }
+    #over-title {
+      font-family: var(--font-display); font-weight: 700;
+      font-size: clamp(2rem, 8vw, 2.8rem); letter-spacing: 0.18em;
+      color: var(--col-R);
+      text-shadow: 0 0 22px rgba(255,77,109,0.55);
+      margin: 0 0 6px;
+    }
+    #screen-over.victory #over-title {
+      color: #b1ffc1;
+      text-shadow: 0 0 22px rgba(77,255,138,0.55);
+    }
+    .score-label {
+      color: var(--muted); font-size: 0.82rem;
+      letter-spacing: 0.18em; text-transform: uppercase; margin-top: 18px;
+    }
+    .score-big {
+      font-family: var(--font-mono); font-weight: 800;
+      font-variant-numeric: tabular-nums;
+      font-size: clamp(3.2rem, 14vw, 4.6rem); line-height: 1;
+      margin-top: 6px;
+      background: linear-gradient(180deg, var(--accent) 0%, var(--accent-hot) 100%);
+      -webkit-background-clip: text; background-clip: text;
+      color: transparent;
+      filter: drop-shadow(0 0 18px rgba(92,220,255,0.35));
+    }
+
+    /* ────────── Language picker (top-right) ────────── */
+    .lang-corner {
+      position: fixed; top: max(8px, env(safe-area-inset-top, 0px)); right: 8px; z-index: 50;
+      display: flex; gap: 2px; padding: 3px;
+      background: rgba(8,10,22,0.65); border: 1px solid var(--border-strong);
+      border-radius: 999px;
+      backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+      box-shadow: 0 4px 12px -4px rgba(0,0,0,0.6);
+    }
+    .lang-corner button {
+      flex: 0 0 auto; padding: 5px 10px; font-size: 0.72rem; font-weight: 600;
+      font-family: var(--font-display); letter-spacing: 0.12em;
+      border-radius: 999px; background: transparent; color: var(--muted); border: 0;
+    }
+    .lang-corner button.selected {
+      background: linear-gradient(180deg, rgba(92,220,255,0.26), rgba(92,220,255,0.10));
+      color: var(--text);
+      box-shadow: 0 0 0 1px rgba(92,220,255,0.4) inset;
+    }
+
+    /* ────────── Best score display on start screen ────────── */
+    .best {
+      display: flex; align-items: center; justify-content: space-between;
+      gap: 10px; padding: 10px 14px; border-radius: 12px;
+      background: linear-gradient(180deg, rgba(255,174,59,0.08), rgba(255,174,59,0.02));
+      border: 1px solid rgba(255,174,59,0.3);
+      box-shadow: 0 0 18px -8px rgba(255,174,59,0.5);
+    }
+    .best .best-label {
+      font-family: var(--font-display); font-weight: 700;
+      font-size: 0.72rem; letter-spacing: 0.16em; text-transform: uppercase;
+      color: var(--boss);
+    }
+    .best .best-score {
+      font-family: var(--font-mono); font-weight: 800;
+      font-variant-numeric: tabular-nums;
+      font-size: 1.4rem; color: var(--text);
+    }
+    .best .best-age {
+      font-size: 0.78rem; color: var(--muted);
+    }
+    .best.empty .best-score { color: var(--dim); font-size: 0.95rem; font-family: var(--font-body); font-weight: 400; }
+    .best.empty .best-age { display: none; }
+
+    /* ────────── Reduced motion ────────── */
+    @media (prefers-reduced-motion: reduce) {
+      .start-btn::after { transition: none; }
+      .screen.active { animation: none; }
+      .overlay { transition: opacity 120ms ease; }
+      .conn.reconnecting { animation: none; }
+    }
   </style>
 </head>
 <body>
 
+  <div class="lang-corner" id="lang-picker" aria-label="Language"></div>
+
   <div id="screen-start" class="screen active">
-    <h1>WLED Game</h1>
-    <div>Acerta nas luzes com a cor certa antes que cheguem ao fogo.</div>
-
-    <div class="row"><label style="flex:0 0 6em">WLED</label>
-      <select id="wled-select" style="flex:1"></select></div>
-
-    <div class="row"><label style="flex:0 0 6em">Mode</label>
-      <div class="picker" style="flex:1">
-        <button data-mode="consumed" class="selected">Consumed</button>
-        <button data-mode="stuck">Stuck at front</button>
-      </div></div>
-
-    <div class="row"><label style="flex:0 0 6em">Kids mode</label>
-      <div class="picker" style="flex:1">
-        <button data-kids="false" class="selected">No</button>
-        <button data-kids="true">Yes</button>
-      </div></div>
-
-    <div class="row"><label style="flex:0 0 6em">W enemies</label>
-      <div class="picker" style="flex:1">
-        <button data-w="false" class="selected">Off</button>
-        <button data-w="true">On</button>
-      </div></div>
-
-    <div>
-      <div class="row"><label style="flex:0 0 6em">Background</label>
-        <div class="picker" style="flex:1">
-          <button data-bg="off" class="selected">Off</button>
-          <button data-bg="solid">Solid</button>
-          <button data-bg="breathe">Breathe</button>
-        </div></div>
-      <div id="bg-color-row" style="display:none; margin-top: 8px;">
-        <div class="swatches" id="swatches"></div>
-        <input type="color" id="custom-color" value="#3344ff" style="margin-top:6px; width:100%; height:40px;">
+    <header class="brand">
+      <div class="brand-row">
+        <div class="brand-mark" aria-hidden="true"><i></i></div>
+        <h1 data-t="app.title">WLED Game</h1>
       </div>
+      <p data-t="app.subtitle">Hit the lights with the right color before they reach the fire.</p>
+    </header>
+
+    <div class="card" style="overflow-y: auto; min-height: 0;">
+      <div class="row"><label data-t="start.label.wled">WLED</label>
+        <select id="wled-select"></select></div>
+
+      <div class="row"><label data-t="start.label.mode">Mode</label>
+        <div class="picker" style="flex:1">
+          <button data-endless="false" class="selected" data-t="start.opt.campaign">Campaign</button>
+          <button data-endless="true" data-t="start.opt.endless">Endless</button>
+        </div></div>
+
+      <div class="row"><label data-t="start.label.wrongColor">Wrong color</label>
+        <div class="picker" style="flex:1">
+          <button data-mode="consumed" class="selected" data-t="start.opt.consumed">Consumed</button>
+          <button data-mode="stuck" data-t="start.opt.stuck">Stuck at front</button>
+        </div></div>
+
+      <div class="row"><label data-t="start.label.kids">Kids mode</label>
+        <div class="picker" style="flex:1">
+          <button data-kids="false" class="selected" data-t="start.opt.no">No</button>
+          <button data-kids="true" data-t="start.opt.yes">Yes</button>
+        </div></div>
+
+      <div class="row"><label data-t="start.label.wEnemies">W enemies</label>
+        <div class="picker" style="flex:1">
+          <button data-w="false" class="selected" data-t="start.opt.off">Off</button>
+          <button data-w="true" data-t="start.opt.on">On</button>
+        </div></div>
+
+      <div>
+        <div class="row"><label data-t="start.label.background">Background</label>
+          <div class="picker" style="flex:1">
+            <button data-bg="off" class="selected" data-t="start.opt.off">Off</button>
+            <button data-bg="solid" data-t="start.opt.solid">Solid</button>
+            <button data-bg="breathe" data-t="start.opt.breathe">Breathe</button>
+          </div></div>
+        <div id="bg-color-row" style="display:none; margin-top: 10px;">
+          <div class="swatches" id="swatches"></div>
+          <input type="color" id="custom-color" value="#3344ff" style="margin-top:8px;">
+        </div>
+      </div>
+
+      <div class="row"><label data-t="start.label.tunnels">Tunnels</label>
+        <div class="picker" style="flex:1">
+          <button data-tunnels="false" class="selected" data-t="start.opt.off">Off</button>
+          <button data-tunnels="true" data-t="start.opt.on">On</button>
+        </div></div>
+
+      <div class="row"><label data-t="start.label.preview">Preview strip</label>
+        <div class="picker" style="flex:1">
+          <button data-preview="false" class="selected" data-t="start.opt.off">Off</button>
+          <button data-preview="true" data-t="start.opt.on">On</button>
+        </div></div>
     </div>
 
-    <div class="row"><label style="flex:0 0 6em">Preview strip</label>
-      <div class="picker" style="flex:1">
-        <button data-preview="false" class="selected">Off</button>
-        <button data-preview="true">On</button>
-      </div></div>
+    <div class="best empty" id="best-row" aria-live="polite">
+      <span class="best-label" data-t="start.best">Best</span>
+      <span class="best-score" id="best-score">—</span>
+      <span class="best-age" id="best-age"></span>
+    </div>
 
-    <div style="flex:1"></div>
-    <button id="start-btn" class="start-btn">COMEÇAR</button>
+    <button id="start-btn" class="start-btn" data-t="start.button">START</button>
   </div>
 
   <div id="screen-game" class="screen">
-    <div class="top">
-      <div class="score" id="score">0</div>
-      <div class="bri">
-        <span style="font-size:0.85rem">☼</span>
-        <input id="brightness" type="range" min="10" max="100" value="70">
-        <span id="bri-val" style="font-size:0.85rem; min-width:2.5em; text-align:right">70%</span>
+    <div class="hud">
+      <div class="hud-meta">
+        <span class="level-badge" id="level-badge">L1</span>
+        <span class="conn" id="conn" aria-label="connection"></span>
       </div>
-      <div class="conn" id="conn"></div>
+      <div class="score" id="score">0</div>
+      <div class="hud-meta" aria-hidden="true" style="min-width: 132px"></div>
     </div>
-    <div style="flex:1"></div>
-    <div id="strip-wrap" style="display:none; height: 28px; background: #111; border-radius: 6px; overflow: hidden;">
-      <canvas id="strip-canvas" style="image-rendering: pixelated; width: 100%; height: 100%; display: block;"></canvas>
+    <div class="bri-bar">
+      <span class="bri-icon" aria-hidden="true">☀</span>
+      <input id="brightness" type="range" min="10" max="100" value="70">
+      <span id="bri-val">70%</span>
     </div>
+    <div class="boss-banner" id="boss-banner">
+      <span class="boss-skull" aria-hidden="true">☠</span>
+      <span id="boss-banner-text">BOSS</span>
+    </div>
+    <div class="hp-bar" id="hp-bar"><i id="hp-fill" style="width: 100%"></i></div>
+    <div class="game-fill"></div>
+    <div class="overlay" id="overlay"><div class="ot" id="overlay-text"></div></div>
+    <div id="strip-wrap"><canvas id="strip-canvas"></canvas></div>
     <div class="pad">
-      <button class="btn-color btn-R" data-color="R"></button>
-      <button class="btn-color btn-G" data-color="G"></button>
-      <button class="btn-color btn-B" data-color="B"></button>
+      <button class="btn-color btn-R" data-color="R"><span class="btn-letter">R</span></button>
+      <button class="btn-color btn-G" data-color="G"><span class="btn-letter">G</span></button>
+      <button class="btn-color btn-B" data-color="B"><span class="btn-letter">B</span></button>
     </div>
   </div>
 
-  <div id="screen-over" class="screen over">
-    <h1>GAME OVER</h1>
-    <div>Score</div>
-    <div class="score-big" id="final-score">0</div>
-    <div style="flex:1"></div>
-    <button id="again-btn" class="start-btn">Jogar outra vez</button>
+  <div id="screen-over" class="screen">
+    <div class="game-fill"></div>
+    <div class="over-card">
+      <h1 id="over-title" data-t="over.title.gameOver">GAME OVER</h1>
+      <div class="score-label" data-t="over.score">Score</div>
+      <div class="score-big" id="final-score">0</div>
+    </div>
+    <div class="game-fill"></div>
+    <button id="again-btn" class="start-btn" data-t="over.again">Play again</button>
   </div>
 
   <script>
+  // ── i18n ──────────────────────────────────────────────────────────────
+  // Resolution: localStorage('wledgame.lang') → server defaultLang → navigator.language → 'en'.
+  // English bundle is also loaded as fallback so missing keys never render the raw key id.
+  const I18N = {
+    supported: ['en'],          // overwritten by /api/config
+    serverDefault: 'en',        //   "
+    current: 'en',
+    bundle: {},                 // active locale
+    fallback: {},               // always English
+  };
+  function $(sel) { return document.querySelector(sel); }
+  function $$(sel) { return [...document.querySelectorAll(sel)]; }
+  function t(key, params) {
+    let s = I18N.bundle[key];
+    if (s === undefined) s = I18N.fallback[key];
+    if (s === undefined) return key;
+    if (params) for (const [k, v] of Object.entries(params)) s = s.replaceAll('{{' + k + '}}', v);
+    return s;
+  }
+  function applyTranslations() {
+    document.documentElement.setAttribute('lang', I18N.current);
+    document.title = t('app.title');
+    for (const el of $$('[data-t]')) el.textContent = t(el.dataset.t);
+    // re-render anything dynamic that is currently visible
+    if (typeof renderWleds === 'function' && state.wleds.length) renderWleds();
+    if (typeof rebuildLangPicker === 'function') rebuildLangPicker();
+  }
+  async function loadLocale(lang) {
+    const res = await fetch(`/locales/${lang}.json`, { cache: 'no-cache' });
+    if (!res.ok) throw new Error(`locale ${lang} HTTP ${res.status}`);
+    return res.json();
+  }
+  function pickLang() {
+    const stored = localStorage.getItem('wledgame.lang');
+    if (stored && I18N.supported.includes(stored)) return stored;
+    if (I18N.supported.includes(I18N.serverDefault)) return I18N.serverDefault;
+    const nav = (navigator.language || 'en').slice(0, 2).toLowerCase();
+    if (I18N.supported.includes(nav)) return nav;
+    return 'en';
+  }
+  async function setLang(lang, persist = true) {
+    if (!I18N.supported.includes(lang)) lang = 'en';
+    I18N.current = lang;
+    I18N.bundle = await loadLocale(lang);
+    if (persist) localStorage.setItem('wledgame.lang', lang);
+    applyTranslations();
+  }
+  async function initI18n() {
+    // Always load English first (fallback bundle).
+    try { I18N.fallback = await loadLocale('en'); I18N.bundle = I18N.fallback; }
+    catch (_) { /* page text data-t fallback still applies */ }
+    // Pull server defaults; failure is non-fatal.
+    try {
+      const cfg = await (await fetch('/api/config')).json();
+      if (Array.isArray(cfg.supportedLangs)) I18N.supported = cfg.supportedLangs;
+      if (typeof cfg.defaultLang === 'string')  I18N.serverDefault = cfg.defaultLang;
+    } catch (_) { I18N.supported = ['en', 'pt', 'fr']; }
+    await setLang(pickLang(), /*persist=*/false);
+  }
+  function rebuildLangPicker() {
+    const el = $('#lang-picker');
+    if (!el) return;
+    el.replaceChildren();
+    for (const code of I18N.supported) {
+      const b = document.createElement('button');
+      b.textContent = code.toUpperCase();
+      if (code === I18N.current) b.classList.add('selected');
+      b.addEventListener('click', () => {
+        for (const x of el.children) x.classList.remove('selected');
+        b.classList.add('selected');
+        setLang(code, true);
+      });
+      el.appendChild(b);
+    }
+  }
+
   const SWATCHES = ['#ffd29e','#1a3a8c','#8c1a1a','#ff9a1a','#1a8c8c','#a020a0','#5020a0','#444444'];
 
   const state = {
     wleds: [], wledId: null,
     wrongColorMode: 'consumed', kidsMode: false,
     wEnemies: localStorage.getItem('wledgame.wEnemies') === 'true',
+    endless: false,
+    tunnels: false,
     background: { mode: 'off', color: SWATCHES[1] },
     brightness: Number(localStorage.getItem('wledgame.brightness') || 70),
     preview: localStorage.getItem('wledgame.preview') === 'true',
     cooldownEndTs: 0,
+    bests: {},  // map<setupKey, { score, ts }>
     ws: null, reconnectAttempt: 0,
   };
 
@@ -144,8 +692,6 @@
     if (saved && saved.mode) state.background = saved;
   } catch (_) {}
 
-  function $(sel) { return document.querySelector(sel); }
-  function $$(sel) { return [...document.querySelectorAll(sel)]; }
   function show(id) {
     $$('.screen').forEach(s => s.classList.remove('active'));
     $('#' + id).classList.add('active');
@@ -161,11 +707,19 @@
     });
   }
 
-  bindPicker('.picker [data-mode]', b => state.wrongColorMode = b.dataset.mode);
-  bindPicker('.picker [data-kids]', b => state.kidsMode = b.dataset.kids === 'true');
+  bindPicker('.picker [data-mode]', b => { state.wrongColorMode = b.dataset.mode; refreshBest(); });
+  bindPicker('.picker [data-kids]', b => { state.kidsMode = b.dataset.kids === 'true'; refreshBest(); });
   bindPicker('.picker [data-w]', b => {
     state.wEnemies = b.dataset.w === 'true';
     localStorage.setItem('wledgame.wEnemies', String(state.wEnemies));
+    refreshBest();
+  });
+  bindPicker('.picker [data-endless]', b => {
+    state.endless = b.dataset.endless === 'true';
+    refreshBest();
+  });
+  bindPicker('.picker [data-tunnels]', b => {
+    state.tunnels = b.dataset.tunnels === 'true';
   });
   bindPicker('.picker [data-bg]', b => {
     state.background.mode = b.dataset.bg;
@@ -175,7 +729,7 @@
   bindPicker('.picker [data-preview]', b => {
     state.preview = b.dataset.preview === 'true';
     localStorage.setItem('wledgame.preview', String(state.preview));
-    $('#strip-wrap').style.display = state.preview ? '' : 'none';
+    $('#strip-wrap').style.display = state.preview ? 'block' : 'none';
     send({ type: 'preview', enabled: state.preview });
   });
 
@@ -231,20 +785,26 @@
       wrongColorMode: state.wrongColorMode,
       kidsMode: state.kidsMode,
       wEnemies: state.wEnemies,
+      endless: state.endless,
+      tunnels: state.tunnels,
       background: state.background.mode === 'off'
         ? { mode: 'off' }
         : { mode: state.background.mode, color: state.background.color },
     });
     show('screen-game');
+    setLevelBadge(null);
+    hideHpBar();
+    hideBossBanner();
   });
   $('#again-btn').addEventListener('click', () => {
     const wait = state.cooldownEndTs - Date.now();
     if (wait > 0) {
-      $('#again-btn').disabled = true;
-      $('#again-btn').textContent = `Aguarda ${Math.ceil(wait/1000)}s…`;
+      const btn = $('#again-btn');
+      btn.disabled = true;
+      btn.textContent = t('over.cooldown', { seconds: Math.ceil(wait/1000) });
       setTimeout(() => {
-        $('#again-btn').disabled = false;
-        $('#again-btn').textContent = 'Jogar outra vez';
+        btn.disabled = false;
+        btn.textContent = t('over.again');
         show('screen-start');
       }, wait);
     } else {
@@ -259,7 +819,8 @@
       const o = document.createElement('option');
       o.value = w.id;
       const ledLabel = (w.ledCount == null) ? '?' : String(w.ledCount);
-      o.textContent = `${w.name} (${ledLabel} LEDs)${w.online ? '' : ' — offline'}`;
+      const offline = w.online ? '' : ` — ${t('wled.offline')}`;
+      o.textContent = `${w.name} (${ledLabel} ${t('wled.ledsSuffix')})${offline}`;
       o.disabled = !w.online;
       sel.appendChild(o);
     }
@@ -267,7 +828,49 @@
     state.wledId = firstOnline ? firstOnline.id : (state.wleds[0]?.id ?? null);
     if (state.wledId) sel.value = state.wledId;
     $('#start-btn').disabled = !firstOnline;
-    sel.addEventListener('change', () => state.wledId = sel.value);
+    sel.addEventListener('change', () => { state.wledId = sel.value; refreshBest(); });
+    refreshBest();
+  }
+
+  // Mirror src/highscores.js setupKey() — keep field order in sync.
+  function currentSetupKey() {
+    if (!state.wledId) return null;
+    return [
+      state.wledId,
+      state.wrongColorMode,
+      state.kidsMode ? 'kids' : 'std',
+      state.wEnemies ? 'wEn' : 'wOff',
+      state.endless ? 'endless' : 'campaign',
+    ].join('|');
+  }
+  function relativeAge(tsMs) {
+    const diffSec = Math.max(0, Math.floor((Date.now() - tsMs) / 1000));
+    const lang = I18N.current || 'en';
+    let rtf;
+    try { rtf = new Intl.RelativeTimeFormat(lang, { numeric: 'auto', style: 'short' }); }
+    catch { rtf = new Intl.RelativeTimeFormat('en', { numeric: 'auto', style: 'short' }); }
+    if (diffSec < 60)       return rtf.format(-diffSec, 'second');
+    if (diffSec < 3600)     return rtf.format(-Math.floor(diffSec / 60), 'minute');
+    if (diffSec < 86400)    return rtf.format(-Math.floor(diffSec / 3600), 'hour');
+    if (diffSec < 86400*30) return rtf.format(-Math.floor(diffSec / 86400), 'day');
+    if (diffSec < 86400*365)return rtf.format(-Math.floor(diffSec / (86400*30)), 'month');
+    return rtf.format(-Math.floor(diffSec / (86400*365)), 'year');
+  }
+  function refreshBest() {
+    const row = $('#best-row');
+    const scoreEl = $('#best-score');
+    const ageEl = $('#best-age');
+    const key = currentSetupKey();
+    const best = key ? state.bests[key] : null;
+    if (!best) {
+      row.classList.add('empty');
+      scoreEl.textContent = t('start.bestNone');
+      ageEl.textContent = '';
+    } else {
+      row.classList.remove('empty');
+      scoreEl.textContent = String(best.score);
+      ageEl.textContent = relativeAge(best.ts);
+    }
   }
 
   function send(obj) {
@@ -293,18 +896,108 @@
     setTimeout(connect, delay);
   }
 
+  // The HUD badge stays as a compact ID (L1, BOSS 1, ∞) regardless of language —
+  // small space + numbers/IDs are universal. The full localized name shows in the overlay.
+  function setLevelBadge(level) {
+    const el = $('#level-badge');
+    el.classList.remove('boss', 'endless');
+    if (!level) { el.textContent = '—'; return; }
+    if (level.isEndless) { el.textContent = '∞'; el.classList.add('endless'); return; }
+    if (level.isBoss) {
+      const n = level.id.replace(/^B/, '');
+      el.textContent = 'BOSS ' + n;
+      el.classList.add('boss');
+      return;
+    }
+    el.textContent = level.id; // L1, L2, …
+  }
+
+  // Map a Level snapshot/event to the localized display name shown in overlays.
+  function localizedLevelName(level) {
+    if (level.isEndless) return t('level.endless');
+    if (level.isBoss) {
+      const key = 'level.boss' + level.id.replace(/^B/, '');
+      return t(key);
+    }
+    const n = Number(level.id.replace(/^L/, '')) || 1;
+    return t('level.regular', { n });
+  }
+
+  function showOverlay(text, kind) {
+    const ov = $('#overlay');
+    $('#overlay-text').textContent = text;
+    ov.classList.remove('boss', 'victory');
+    if (kind) ov.classList.add(kind);
+    ov.classList.add('show');
+    clearTimeout(showOverlay._t);
+    showOverlay._t = setTimeout(() => ov.classList.remove('show'), 1400);
+  }
+
+  function showHpBar(hp, maxHp) {
+    const bar = $('#hp-bar');
+    bar.style.display = '';
+    $('#hp-fill').style.width = (100 * hp / maxHp).toFixed(1) + '%';
+  }
+  function hideHpBar() { $('#hp-bar').style.display = 'none'; }
+  function showBossBanner(name) {
+    $('#boss-banner-text').textContent = name;
+    $('#boss-banner').classList.add('show');
+  }
+  function hideBossBanner() { $('#boss-banner').classList.remove('show'); }
+
   function onMessage(m) {
     switch (m.type) {
       case 'hello':
-        state.wleds = m.wleds; renderWleds(); break;
+        state.wleds = m.wleds;
+        if (Array.isArray(m.bests)) {
+          state.bests = {};
+          for (const b of m.bests) state.bests[b.key] = { score: b.score, ts: b.ts };
+        }
+        renderWleds();
+        break;
       case 'state':
         $('#score').textContent = m.score;
-        if (m.phase === 'playing' && document.querySelector('.screen.active').id !== 'screen-game') {
+        if (m.level) setLevelBadge(m.level);
+        if ((m.phase === 'playing' || m.phase === 'levelTransition')
+            && document.querySelector('.screen.active').id !== 'screen-game') {
           show('screen-game');
         } else if (m.phase === 'idle') {
           show('screen-start');
         }
         break;
+      case 'levelStart': {
+        setLevelBadge(m.level);
+        const name = localizedLevelName(m.level);
+        if (m.level.isBoss) {
+          showOverlay(name.toUpperCase(), 'boss');
+          showBossBanner(name);
+        } else if (m.level.isEndless) {
+          showOverlay(t('overlay.endlessMode'), 'endless');
+          hideBossBanner();
+        } else {
+          showOverlay(name.toUpperCase(), null);
+          hideBossBanner();
+        }
+        if (!m.level.isBoss) hideHpBar();
+        break;
+      }
+      case 'bossHit': {
+        showHpBar(m.hp, m.maxHp);
+        $$('.btn-color').forEach(b => { if (b.dataset.color === m.color) flash(b, 'flash'); });
+        navigator.vibrate?.(40);
+        break;
+      }
+      case 'bossDefeated': {
+        hideHpBar();
+        hideBossBanner();
+        showOverlay(t('overlay.bossDown'), 'victory');
+        navigator.vibrate?.([60, 30, 60, 30, 100]);
+        break;
+      }
+      case 'campaignComplete': {
+        showOverlay(t('overlay.victory'), 'victory');
+        break;
+      }
       case 'hit': {
         $$('.btn-color').forEach(b => { if (b.dataset.color === m.color) flash(b, 'flash'); });
         navigator.vibrate?.(30);
@@ -319,13 +1012,19 @@
       case 'gameOver':
         state.cooldownEndTs = Date.now() + (m.cooldownMs || 5000);
         $('#final-score').textContent = m.score;
+        $('#over-title').textContent = m.victory ? t('over.title.victory') : t('over.title.gameOver');
+        $('#screen-over').classList.toggle('victory', !!m.victory);
+        if (m.newBest && m.best) {
+          const key = currentSetupKey();
+          if (key) state.bests[key] = { score: m.best.score, ts: m.best.ts };
+        }
         show('screen-over');
         break;
       case 'error':
         if (m.reason === 'cooldown') {
           state.cooldownEndTs = Date.now() + (m.retryInMs || 0);
         } else if (m.reason === 'wled_unreachable') {
-          alert('WLED unreachable.');
+          alert(t('err.wledUnreachable'));
         }
         break;
       case 'pong': break;
@@ -340,7 +1039,7 @@
   const stripCanvas = $('#strip-canvas');
   const stripCtx = stripCanvas.getContext('2d');
   function drawStrip(b64, n) {
-    if (stripCanvas.width !== n) {
+    if (stripCanvas.width !== n || stripCanvas.height !== 1) {
       stripCanvas.width = n;
       stripCanvas.height = 1;
     }
@@ -364,12 +1063,12 @@
   $$('.picker [data-preview]').forEach(b => {
     b.classList.toggle('selected', (b.dataset.preview === 'true') === state.preview);
   });
-  $('#strip-wrap').style.display = state.preview ? '' : 'none';
+  $('#strip-wrap').style.display = state.preview ? 'block' : 'none';
   $$('.picker [data-w]').forEach(b => {
     b.classList.toggle('selected', (b.dataset.w === 'true') === state.wEnemies);
   });
 
-  connect();
+  initI18n().finally(connect);
   </script>
 </body>
 </html>
