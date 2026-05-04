@@ -5,7 +5,6 @@ import {
 } from './game.js';
 import { renderFrame } from './render.js';
 import { createLevelManager, findLevelIdx } from './levels.js';
-import { loadProgression, saveProgression } from './progression.js';
 import { log } from './log.js';
 
 const COLORS = ['R', 'G', 'B'];
@@ -21,7 +20,6 @@ export function createGameRunner({ cfg, wledStore, sender, broadcast, broadcastF
   let logTimer = null;
   let frameCount = 0;
   let lastFpsLog = 0;
-  let progression = loadProgression(cfg.stateDir);
 
   function reset(ledCount) {
     gs = createGameState({ ledCount, fireZoneLeds: cfg.fireZoneLeds });
@@ -37,9 +35,6 @@ export function createGameRunner({ cfg, wledStore, sender, broadcast, broadcastF
     if (!w.online) {
       await wledStore.probeAll(1500);
       if (!w.online) return { ok: false, reason: 'wled_unreachable' };
-    }
-    if (endless && !progression.endlessUnlocked) {
-      return { ok: false, reason: 'endless_locked' };
     }
     activeWled = w;
     reset(w.ledCount);
@@ -213,11 +208,6 @@ export function createGameRunner({ cfg, wledStore, sender, broadcast, broadcastF
       const next = levelMgr.advance(now);
       if (!next) {
         // Campaign complete!
-        if (!progression.endlessUnlocked) {
-          progression.endlessUnlocked = true;
-          saveProgression(cfg.stateDir, progression).catch(e =>
-            log.warn('save progression failed', { error: String(e.message || e) }));
-        }
         broadcast({ type: 'campaignComplete', score: gs.score });
         // Transition to "over" — campaign clear is a victory condition, no game-over flash.
         gameOver(gs, cfg.game.gameOverCooldownMs);
@@ -265,7 +255,6 @@ export function createGameRunner({ cfg, wledStore, sender, broadcast, broadcastF
       brightness: gs?.brightness ?? 70,
       level: lvSnap,
       transitionUntilTs: gs?.transitionUntilTs ?? 0,
-      endlessUnlocked: !!progression.endlessUnlocked,
     };
   }
 

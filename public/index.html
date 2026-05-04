@@ -69,7 +69,7 @@
     <div class="row"><label style="flex:0 0 6em">WLED</label>
       <select id="wled-select" style="flex:1"></select></div>
 
-    <div class="row"><label style="flex:0 0 6em">Mode</label>
+    <div class="row"><label style="flex:0 0 6em">Wrong color</label>
       <div class="picker" style="flex:1">
         <button data-mode="consumed" class="selected">Consumed</button>
         <button data-mode="stuck">Stuck at front</button>
@@ -87,10 +87,10 @@
         <button data-w="true">On</button>
       </div></div>
 
-    <div class="row" id="endless-row" style="display:none"><label style="flex:0 0 6em">Endless</label>
+    <div class="row"><label style="flex:0 0 6em">Mode</label>
       <div class="picker" style="flex:1">
         <button data-endless="false" class="selected">Campaign</button>
-        <button data-endless="true">Endless mode</button>
+        <button data-endless="true">Endless</button>
       </div></div>
 
     <div>
@@ -158,7 +158,6 @@
     wrongColorMode: 'consumed', kidsMode: false,
     wEnemies: localStorage.getItem('wledgame.wEnemies') === 'true',
     endless: false,
-    endlessUnlocked: false,
     background: { mode: 'off', color: SWATCHES[1] },
     brightness: Number(localStorage.getItem('wledgame.brightness') || 70),
     preview: localStorage.getItem('wledgame.preview') === 'true',
@@ -261,7 +260,7 @@
       wrongColorMode: state.wrongColorMode,
       kidsMode: state.kidsMode,
       wEnemies: state.wEnemies,
-      endless: state.endless && state.endlessUnlocked,
+      endless: state.endless,
       background: state.background.mode === 'off'
         ? { mode: 'off' }
         : { mode: state.background.mode, color: state.background.color },
@@ -364,10 +363,6 @@
         state.wleds = m.wleds; renderWleds(); break;
       case 'state':
         $('#score').textContent = m.score;
-        if (m.endlessUnlocked && !state.endlessUnlocked) {
-          state.endlessUnlocked = true;
-          $('#endless-row').style.display = '';
-        }
         if (m.level) setLevelBadge(m.level);
         if ((m.phase === 'playing' || m.phase === 'levelTransition')
             && document.querySelector('.screen.active').id !== 'screen-game') {
@@ -426,9 +421,6 @@
           state.cooldownEndTs = Date.now() + (m.retryInMs || 0);
         } else if (m.reason === 'wled_unreachable') {
           alert('WLED unreachable.');
-        } else if (m.reason === 'endless_locked') {
-          alert('Endless mode locked. Beat the campaign first.');
-          show('screen-start');
         }
         break;
       case 'pong': break;
