@@ -34,7 +34,8 @@ export function parseClientMessage(raw) {
         if (typeof bg.color !== 'string' || !/^#[0-9a-fA-F]{6}$/.test(bg.color)) bad('start.background.color');
       }
       const endless = !!m.endless;
-      return { type: 'start', wledId: m.wledId, wrongColorMode: m.wrongColorMode, kidsMode, wEnemies, endless, background: bg };
+      const tunnels = !!m.tunnels;
+      return { type: 'start', wledId: m.wledId, wrongColorMode: m.wrongColorMode, kidsMode, wEnemies, endless, tunnels, background: bg };
     }
     case 'preview': {
       return { type: 'preview', enabled: !!m.enabled };

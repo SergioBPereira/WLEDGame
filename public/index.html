@@ -273,6 +273,24 @@
       font-variant-numeric: tabular-nums; min-width: 2.6em; text-align: right;
     }
 
+    .boss-banner {
+      display: none;
+      align-items: center; justify-content: center; gap: 8px;
+      padding: 8px 14px; border-radius: 12px;
+      background: linear-gradient(180deg, rgba(255,174,59,0.18), rgba(255,174,59,0.04));
+      border: 1px solid rgba(255,174,59,0.45);
+      box-shadow: 0 0 24px -6px rgba(255,174,59,0.55);
+      font-family: var(--font-display); font-weight: 700; font-size: 0.82rem;
+      letter-spacing: 0.16em; text-transform: uppercase; color: var(--boss);
+      animation: boss-pulse 2.4s ease-in-out infinite;
+    }
+    .boss-banner.show { display: flex; }
+    @keyframes boss-pulse {
+      0%, 100% { box-shadow: 0 0 24px -6px rgba(255,174,59,0.45); }
+      50%      { box-shadow: 0 0 36px -2px rgba(255,174,59,0.85); }
+    }
+    .boss-banner .boss-skull { font-size: 1rem; line-height: 1; }
+
     .hp-bar {
       height: 8px; background: var(--surface-low); border: 1px solid var(--border);
       border-radius: 999px; overflow: hidden; display: none; position: relative;
@@ -514,6 +532,12 @@
         </div>
       </div>
 
+      <div class="row"><label data-t="start.label.tunnels">Tunnels</label>
+        <div class="picker" style="flex:1">
+          <button data-tunnels="false" class="selected" data-t="start.opt.off">Off</button>
+          <button data-tunnels="true" data-t="start.opt.on">On</button>
+        </div></div>
+
       <div class="row"><label data-t="start.label.preview">Preview strip</label>
         <div class="picker" style="flex:1">
           <button data-preview="false" class="selected" data-t="start.opt.off">Off</button>
@@ -543,6 +567,10 @@
       <span class="bri-icon" aria-hidden="true">☀</span>
       <input id="brightness" type="range" min="10" max="100" value="70">
       <span id="bri-val">70%</span>
+    </div>
+    <div class="boss-banner" id="boss-banner">
+      <span class="boss-skull" aria-hidden="true">☠</span>
+      <span id="boss-banner-text">BOSS</span>
     </div>
     <div class="hp-bar" id="hp-bar"><i id="hp-fill" style="width: 100%"></i></div>
     <div class="game-fill"></div>
@@ -650,6 +678,7 @@
     wrongColorMode: 'consumed', kidsMode: false,
     wEnemies: localStorage.getItem('wledgame.wEnemies') === 'true',
     endless: false,
+    tunnels: false,
     background: { mode: 'off', color: SWATCHES[1] },
     brightness: Number(localStorage.getItem('wledgame.brightness') || 70),
     preview: localStorage.getItem('wledgame.preview') === 'true',
@@ -688,6 +717,9 @@
   bindPicker('.picker [data-endless]', b => {
     state.endless = b.dataset.endless === 'true';
     refreshBest();
+  });
+  bindPicker('.picker [data-tunnels]', b => {
+    state.tunnels = b.dataset.tunnels === 'true';
   });
   bindPicker('.picker [data-bg]', b => {
     state.background.mode = b.dataset.bg;
@@ -754,6 +786,7 @@
       kidsMode: state.kidsMode,
       wEnemies: state.wEnemies,
       endless: state.endless,
+      tunnels: state.tunnels,
       background: state.background.mode === 'off'
         ? { mode: 'off' }
         : { mode: state.background.mode, color: state.background.color },
@@ -761,6 +794,7 @@
     show('screen-game');
     setLevelBadge(null);
     hideHpBar();
+    hideBossBanner();
   });
   $('#again-btn').addEventListener('click', () => {
     const wait = state.cooldownEndTs - Date.now();
@@ -905,6 +939,11 @@
     $('#hp-fill').style.width = (100 * hp / maxHp).toFixed(1) + '%';
   }
   function hideHpBar() { $('#hp-bar').style.display = 'none'; }
+  function showBossBanner(name) {
+    $('#boss-banner-text').textContent = name;
+    $('#boss-banner').classList.add('show');
+  }
+  function hideBossBanner() { $('#boss-banner').classList.remove('show'); }
 
   function onMessage(m) {
     switch (m.type) {
@@ -928,12 +967,16 @@
         break;
       case 'levelStart': {
         setLevelBadge(m.level);
+        const name = localizedLevelName(m.level);
         if (m.level.isBoss) {
-          showOverlay(localizedLevelName(m.level).toUpperCase(), 'boss');
+          showOverlay(name.toUpperCase(), 'boss');
+          showBossBanner(name);
         } else if (m.level.isEndless) {
           showOverlay(t('overlay.endlessMode'), 'endless');
+          hideBossBanner();
         } else {
-          showOverlay(localizedLevelName(m.level).toUpperCase(), null);
+          showOverlay(name.toUpperCase(), null);
+          hideBossBanner();
         }
         if (!m.level.isBoss) hideHpBar();
         break;
@@ -946,6 +989,7 @@
       }
       case 'bossDefeated': {
         hideHpBar();
+        hideBossBanner();
         showOverlay(t('overlay.bossDown'), 'victory');
         navigator.vibrate?.([60, 30, 60, 30, 100]);
         break;

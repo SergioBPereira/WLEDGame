@@ -184,11 +184,43 @@ export function startRound(gs, opts) {
   gs.kidsMode = !!opts.kidsMode;
   gs.wEnemies = !!opts.wEnemies;
   gs.endless = !!opts.endless;
+  gs.tunnelsEnabled = !!opts.tunnels;
+  gs.tunnelBase = opts.tunnels ? pickTunnelBase(gs.ledCount, gs.fireZoneLeds) : null;
+  gs.tunnels = []; // recomputed per level once playing
   gs.wledId = opts.wledId;
   gs.background = opts.background;
   gs.brightness = opts.brightness ?? 70;
   gs.startedAt = Date.now();
   gs.transitionUntilTs = 0;
+  gs.transitionStartedAt = 0;
+  gs.transitionKind = null;
+}
+
+// Tunnel base position is picked ONCE per round, after the first 33% of the
+// strip and leaving room for the maximum (15%) tunnel size before the fire zone.
+// Size grows with each level — see tunnelsForLevel().
+export function pickTunnelBase(ledCount, fireZoneLeds, rng = Math.random) {
+  const maxSize = Math.max(1, Math.floor(ledCount * 0.15));
+  const minBase = Math.floor(ledCount * 0.33);
+  const maxBase = Math.max(minBase, ledCount - fireZoneLeds - maxSize);
+  return Math.floor(minBase + rng() * (maxBase - minBase + 1));
+}
+
+// Per-level tunnel extent: starts at 5% of ledCount on level idx 0, grows by
+// 1 LED per level, capped at 15% of ledCount, never crossing the fire zone.
+// Returns a single-element tunnel array (or [] when tunnels are disabled).
+export function tunnelsForLevel(gs, levelIdx) {
+  if (!gs.tunnelsEnabled || gs.tunnelBase == null) return [];
+  const ledCount = gs.ledCount;
+  const fireZoneLeds = gs.fireZoneLeds;
+  const startSize = Math.max(1, Math.floor(ledCount * 0.05));
+  const maxSize   = Math.max(startSize, Math.floor(ledCount * 0.15));
+  const grown     = startSize + Math.max(0, levelIdx);
+  const size      = Math.min(maxSize, grown);
+  const start = gs.tunnelBase;
+  const end   = Math.min(ledCount - fireZoneLeds - 1, start + size - 1);
+  const TUNNEL_BROWN = '#4a2810';
+  return [{ startLed: start, endLed: end, color: TUNNEL_BROWN, brightness: 0.18, _rgb: [0x4a, 0x28, 0x10] }];
 }
 
 export function gameOver(gs, cooldownMs, nowFn = Date.now) {

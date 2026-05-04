@@ -71,15 +71,18 @@ export function renderFireZone(frame, ledCount, fireZoneLeds, t) {
   }
 }
 
-// Subtle high-water-mark of how far any enemy got this round.
-// Renders as a tiny dim cool-white tick so it doesn't compete with live entities.
-export function renderHighWaterMark(frame, virtualPos, ledCount, fireZoneLeds) {
+// "Danger signal": warm pulsing pixel marking how far any enemy got this round.
+// Pulses at ~1Hz so the player notices it without it being noisy. Additive over
+// background; clamped to never paint into the fire zone.
+export function renderHighWaterMark(frame, virtualPos, ledCount, fireZoneLeds, t = 0) {
   if (virtualPos == null || virtualPos <= 0) return;
   const lastNonFire = ledCount - fireZoneLeds;
   const physF = virtualPos * ledCount / 1000;
   const i = Math.min(lastNonFire - 1, Math.max(0, Math.floor(physF)));
-  // Cool dim white — additive so it shows on dark and tints on top of background.
-  const r = 28, g = 36, b = 50;
+  const pulse = 0.5 + 0.5 * Math.sin(t * 2 * Math.PI); // ~1Hz, full breath in 1s
+  const r = Math.floor(220 * pulse);
+  const g = Math.floor(45  * pulse);
+  const b = Math.floor(15  * pulse);
   frame[i*3 + 0] = Math.min(255, frame[i*3 + 0] + r);
   frame[i*3 + 1] = Math.min(255, frame[i*3 + 1] + g);
   frame[i*3 + 2] = Math.min(255, frame[i*3 + 2] + b);
@@ -112,6 +115,31 @@ export function isInTunnel(virtualPos, tunnels, ledCount) {
   return false;
 }
 
+// Whole-strip pulse used during the levelTransition phase.
+// Color is keyed to the transition kind: cyan for normal, amber for boss,
+// magenta for endless. The fire zone stays dark so the next round still has
+// the strip's visual reference.
+const TRANSITION_COLORS = {
+  normal:  [ 92, 220, 255], // cyan
+  boss:    [255, 174,  59], // amber
+  endless: [217, 122, 255], // magenta
+};
+export function renderTransitionFrame({ ledCount, fireZoneLeds, elapsedSec, kind, brightness }) {
+  const f = newFrame(ledCount);
+  const [r, g, b] = TRANSITION_COLORS[kind] || TRANSITION_COLORS.normal;
+  // Sweep from low to high to low across the ~1.5s window — one full breath.
+  const phase = Math.min(1, Math.max(0, elapsedSec / 1.5));
+  const pulse = 0.20 + 0.80 * Math.sin(phase * Math.PI); // 0..1..0
+  const lastNonFire = ledCount - fireZoneLeds;
+  for (let i = 0; i < lastNonFire; i++) {
+    f[i*3 + 0] = Math.floor(r * pulse);
+    f[i*3 + 1] = Math.floor(g * pulse);
+    f[i*3 + 2] = Math.floor(b * pulse);
+  }
+  applyBrightness(f, brightness);
+  return f;
+}
+
 export function applyBrightness(frame, value0to100) {
   const k = value0to100 / 100;
   for (let i = 0; i < frame.length; i++) {
@@ -123,7 +151,7 @@ export function renderFrame({ ledCount, t, background, entities, leadId, brightn
   const frame = newFrame(ledCount);
   const fireZoneLeds = cfg.fireZoneLeds;
   renderBackground(frame, background, ledCount, fireZoneLeds, t, cfg.render);
-  renderHighWaterMark(frame, deepestPos, ledCount, fireZoneLeds);
+  renderHighWaterMark(frame, deepestPos, ledCount, fireZoneLeds, t);
   renderFireZone(frame, ledCount, fireZoneLeds, t);
   for (const e of entities) {
     // Suppress lead emphasis when the lead is hiding inside a tunnel.

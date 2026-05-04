@@ -1,9 +1,9 @@
 import {
   createGameState, startRound, gameOver, checkGameOver, advanceEntities,
   spawnEnemy, spawnBoss, resolveCollisions, renderEntities, leadEntityId,
-  spawnInterval, enemySpeed, applyKidsMode, updateDeepestPos,
+  spawnInterval, enemySpeed, applyKidsMode, updateDeepestPos, tunnelsForLevel,
 } from './game.js';
-import { renderFrame } from './render.js';
+import { renderFrame, renderTransitionFrame } from './render.js';
 import { createLevelManager, findLevelIdx } from './levels.js';
 import { loadHighscores, saveHighscores, recordScore, getBest, setupKey } from './highscores.js';
 import { log } from './log.js';
@@ -27,7 +27,7 @@ export function createGameRunner({ cfg, wledStore, sender, broadcast, broadcastF
     gs = createGameState({ ledCount, fireZoneLeds: cfg.fireZoneLeds });
   }
 
-  async function start({ wledId, wrongColorMode, kidsMode, wEnemies, background, brightness, endless }) {
+  async function start({ wledId, wrongColorMode, kidsMode, wEnemies, background, brightness, endless, tunnels }) {
     if (gs && gs.phase === 'playing') return { ok: false, reason: 'already_running' };
     if (gs && gs.phase === 'over' && Date.now() < gs.overUntilTs) {
       return { ok: false, reason: 'cooldown', retryInMs: gs.overUntilTs - Date.now() };
@@ -42,7 +42,7 @@ export function createGameRunner({ cfg, wledStore, sender, broadcast, broadcastF
     reset(w.ledCount);
     try { await wledStore.saveStateFor(w.id); }
     catch (e) { log.warn('save state failed, continuing', { error: String(e.message || e) }); }
-    startRound(gs, { wrongColorMode, kidsMode, wEnemies, endless, wledId: w.id, background, brightness });
+    startRound(gs, { wrongColorMode, kidsMode, wEnemies, endless, tunnels, wledId: w.id, background, brightness });
     const startIdx = endless ? findLevelIdx('ENDLESS') : 0;
     levelMgr = createLevelManager({ startIdx });
     enterLevelTransition(levelMgr.current(), Date.now());
@@ -72,10 +72,14 @@ export function createGameRunner({ cfg, wledStore, sender, broadcast, broadcastF
   function enterLevelTransition(level, now) {
     gs.phase = 'levelTransition';
     gs.transitionUntilTs = now + TRANSITION_MS;
+    gs.transitionStartedAt = now;
+    gs.transitionKind = level.isEndless ? 'endless' : (level.isBoss ? 'boss' : 'normal');
     gs.currentLevel = {
       id: level.id, displayName: level.displayName,
       isBoss: !!level.isBoss, isEndless: !!level.isEndless,
     };
+    // Tunnels recompute their per-level extent now (size grows with level idx).
+    gs.tunnels = tunnelsForLevel(gs, levelMgr.idx);
     broadcast({ type: 'levelStart', level: gs.currentLevel });
   }
 
@@ -144,19 +148,19 @@ export function createGameRunner({ cfg, wledStore, sender, broadcast, broadcastF
     if (gs.phase === 'idle' || gs.phase === 'over') return;
 
     if (gs.phase === 'levelTransition') {
-      // During transition, no spawning, no advancing — just render a calm frame and wait.
+      // During transition: freeze (no spawn, no advance) and pulse the whole strip
+      // in a kind-coded color so the level change is unmistakable.
       if (now >= gs.transitionUntilTs) {
         exitLevelTransition(now);
         broadcast(stateMessage());
       }
-      // Still render so the strip + preview show the transition state.
-      const flat = renderEntities(gs, now);
-      const frame = renderFrame({
-        ledCount: gs.ledCount, t: (now - gs.startedAt) / 1000,
-        background: gs.background, entities: flat,
-        leadId: leadEntityId(gs), brightness: gs.brightness, cfg,
-        deepestPos: gs.deepestPos,
-        tunnels: activeWled?.tunnels,
+      const elapsed = (now - gs.transitionStartedAt) / 1000;
+      const frame = renderTransitionFrame({
+        ledCount: gs.ledCount,
+        fireZoneLeds: cfg.fireZoneLeds,
+        elapsedSec: elapsed,
+        kind: gs.transitionKind,
+        brightness: gs.brightness,
       });
       if (activeWled) {
         sender.sendFrame({ host: activeWled.host, udpPort: activeWled.udpPort }, frame).catch(err => {
@@ -247,7 +251,7 @@ export function createGameRunner({ cfg, wledStore, sender, broadcast, broadcastF
       brightness: gs.brightness,
       cfg,
       deepestPos: gs.deepestPos,
-      tunnels: activeWled?.tunnels,
+      tunnels: gs.tunnels,
     });
     if (activeWled) {
       sender.sendFrame({ host: activeWled.host, udpPort: activeWled.udpPort }, frame).catch(err => {
