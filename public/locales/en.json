@@ -1,0 +1,47 @@
+{
+  "app.title": "WLED Game",
+  "app.subtitle": "Hit the lights with the right color before they reach the fire.",
+
+  "start.label.wled":         "WLED",
+  "start.label.wrongColor":   "Wrong color",
+  "start.label.kids":         "Kids mode",
+  "start.label.wEnemies":     "W enemies",
+  "start.label.mode":         "Mode",
+  "start.label.background":   "Background",
+  "start.label.preview":      "Preview strip",
+  "start.label.lang":         "Language",
+
+  "start.opt.consumed":  "Consumed",
+  "start.opt.stuck":     "Stuck at front",
+  "start.opt.no":        "No",
+  "start.opt.yes":       "Yes",
+  "start.opt.off":       "Off",
+  "start.opt.on":        "On",
+  "start.opt.campaign":  "Campaign",
+  "start.opt.endless":   "Endless",
+  "start.opt.solid":     "Solid",
+  "start.opt.breathe":   "Breathe",
+
+  "start.button":        "START",
+
+  "wled.ledsSuffix":     "LEDs",
+  "wled.offline":        "offline",
+
+  "over.title.gameOver": "GAME OVER",
+  "over.title.victory":  "VICTORY!",
+  "over.score":          "Score",
+  "over.again":          "Play again",
+  "over.cooldown":       "Wait {{seconds}}s…",
+
+  "level.regular":       "Level {{n}}",
+  "level.boss1":         "Boss: Masterblaster",
+  "level.boss2":         "Boss: The Tank",
+  "level.boss3":         "Boss: RGB Overlord",
+  "level.endless":       "Endless",
+
+  "overlay.bossDown":    "BOSS DOWN",
+  "overlay.victory":     "VICTORY",
+  "overlay.endlessMode": "ENDLESS MODE",
+
+  "err.wledUnreachable": "WLED unreachable."
+}

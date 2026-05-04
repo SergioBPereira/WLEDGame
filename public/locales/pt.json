@@ -1,0 +1,47 @@
+{
+  "app.title": "WLED Game",
+  "app.subtitle": "Acerta nas luzes com a cor certa antes que cheguem ao fogo.",
+
+  "start.label.wled":         "WLED",
+  "start.label.wrongColor":   "Cor errada",
+  "start.label.kids":         "Modo crianças",
+  "start.label.wEnemies":     "Inimigos W",
+  "start.label.mode":         "Modo",
+  "start.label.background":   "Fundo",
+  "start.label.preview":      "Pré-visualização",
+  "start.label.lang":         "Idioma",
+
+  "start.opt.consumed":  "Consumido",
+  "start.opt.stuck":     "Cola na frente",
+  "start.opt.no":        "Não",
+  "start.opt.yes":       "Sim",
+  "start.opt.off":       "Off",
+  "start.opt.on":        "On",
+  "start.opt.campaign":  "Campanha",
+  "start.opt.endless":   "Sem fim",
+  "start.opt.solid":     "Sólido",
+  "start.opt.breathe":   "Respirar",
+
+  "start.button":        "COMEÇAR",
+
+  "wled.ledsSuffix":     "LEDs",
+  "wled.offline":        "offline",
+
+  "over.title.gameOver": "FIM DO JOGO",
+  "over.title.victory":  "VITÓRIA!",
+  "over.score":          "Pontuação",
+  "over.again":          "Jogar outra vez",
+  "over.cooldown":       "Aguarda {{seconds}}s…",
+
+  "level.regular":       "Nível {{n}}",
+  "level.boss1":         "Chefe: Masterblaster",
+  "level.boss2":         "Chefe: O Tanque",
+  "level.boss3":         "Chefe: Senhor RGB",
+  "level.endless":       "Sem fim",
+
+  "overlay.bossDown":    "CHEFE ABATIDO",
+  "overlay.victory":     "VITÓRIA",
+  "overlay.endlessMode": "MODO SEM FIM",
+
+  "err.wledUnreachable": "WLED inalcançável."
+}

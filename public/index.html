@@ -63,42 +63,42 @@
 <body>
 
   <div id="screen-start" class="screen active">
-    <h1>WLED Game</h1>
-    <div>Acerta nas luzes com a cor certa antes que cheguem ao fogo.</div>
+    <h1 data-t="app.title">WLED Game</h1>
+    <div data-t="app.subtitle">Hit the lights with the right color before they reach the fire.</div>
 
-    <div class="row"><label style="flex:0 0 6em">WLED</label>
+    <div class="row"><label style="flex:0 0 6em" data-t="start.label.wled">WLED</label>
       <select id="wled-select" style="flex:1"></select></div>
 
-    <div class="row"><label style="flex:0 0 6em">Wrong color</label>
+    <div class="row"><label style="flex:0 0 6em" data-t="start.label.wrongColor">Wrong color</label>
       <div class="picker" style="flex:1">
-        <button data-mode="consumed" class="selected">Consumed</button>
-        <button data-mode="stuck">Stuck at front</button>
+        <button data-mode="consumed" class="selected" data-t="start.opt.consumed">Consumed</button>
+        <button data-mode="stuck" data-t="start.opt.stuck">Stuck at front</button>
       </div></div>
 
-    <div class="row"><label style="flex:0 0 6em">Kids mode</label>
+    <div class="row"><label style="flex:0 0 6em" data-t="start.label.kids">Kids mode</label>
       <div class="picker" style="flex:1">
-        <button data-kids="false" class="selected">No</button>
-        <button data-kids="true">Yes</button>
+        <button data-kids="false" class="selected" data-t="start.opt.no">No</button>
+        <button data-kids="true" data-t="start.opt.yes">Yes</button>
       </div></div>
 
-    <div class="row"><label style="flex:0 0 6em">W enemies</label>
+    <div class="row"><label style="flex:0 0 6em" data-t="start.label.wEnemies">W enemies</label>
       <div class="picker" style="flex:1">
-        <button data-w="false" class="selected">Off</button>
-        <button data-w="true">On</button>
+        <button data-w="false" class="selected" data-t="start.opt.off">Off</button>
+        <button data-w="true" data-t="start.opt.on">On</button>
       </div></div>
 
-    <div class="row"><label style="flex:0 0 6em">Mode</label>
+    <div class="row"><label style="flex:0 0 6em" data-t="start.label.mode">Mode</label>
       <div class="picker" style="flex:1">
-        <button data-endless="false" class="selected">Campaign</button>
-        <button data-endless="true">Endless</button>
+        <button data-endless="false" class="selected" data-t="start.opt.campaign">Campaign</button>
+        <button data-endless="true" data-t="start.opt.endless">Endless</button>
       </div></div>
 
     <div>
-      <div class="row"><label style="flex:0 0 6em">Background</label>
+      <div class="row"><label style="flex:0 0 6em" data-t="start.label.background">Background</label>
         <div class="picker" style="flex:1">
-          <button data-bg="off" class="selected">Off</button>
-          <button data-bg="solid">Solid</button>
-          <button data-bg="breathe">Breathe</button>
+          <button data-bg="off" class="selected" data-t="start.opt.off">Off</button>
+          <button data-bg="solid" data-t="start.opt.solid">Solid</button>
+          <button data-bg="breathe" data-t="start.opt.breathe">Breathe</button>
         </div></div>
       <div id="bg-color-row" style="display:none; margin-top: 8px;">
         <div class="swatches" id="swatches"></div>
@@ -106,14 +106,17 @@
       </div>
     </div>
 
-    <div class="row"><label style="flex:0 0 6em">Preview strip</label>
+    <div class="row"><label style="flex:0 0 6em" data-t="start.label.preview">Preview strip</label>
       <div class="picker" style="flex:1">
-        <button data-preview="false" class="selected">Off</button>
-        <button data-preview="true">On</button>
+        <button data-preview="false" class="selected" data-t="start.opt.off">Off</button>
+        <button data-preview="true" data-t="start.opt.on">On</button>
       </div></div>
 
+    <div class="row"><label style="flex:0 0 6em" data-t="start.label.lang">Language</label>
+      <div class="picker" id="lang-picker" style="flex:1"></div></div>
+
     <div style="flex:1"></div>
-    <button id="start-btn" class="start-btn">COMEÇAR</button>
+    <button id="start-btn" class="start-btn" data-t="start.button">START</button>
   </div>
 
   <div id="screen-game" class="screen" style="position: relative;">
@@ -143,14 +146,90 @@
   </div>
 
   <div id="screen-over" class="screen over">
-    <h1>GAME OVER</h1>
-    <div>Score</div>
+    <h1 id="over-title" data-t="over.title.gameOver">GAME OVER</h1>
+    <div data-t="over.score">Score</div>
     <div class="score-big" id="final-score">0</div>
     <div style="flex:1"></div>
-    <button id="again-btn" class="start-btn">Jogar outra vez</button>
+    <button id="again-btn" class="start-btn" data-t="over.again">Play again</button>
   </div>
 
   <script>
+  // ── i18n ──────────────────────────────────────────────────────────────
+  // Resolution: localStorage('wledgame.lang') → server defaultLang → navigator.language → 'en'.
+  // English bundle is also loaded as fallback so missing keys never render the raw key id.
+  const I18N = {
+    supported: ['en'],          // overwritten by /api/config
+    serverDefault: 'en',        //   "
+    current: 'en',
+    bundle: {},                 // active locale
+    fallback: {},               // always English
+  };
+  function $(sel) { return document.querySelector(sel); }
+  function $$(sel) { return [...document.querySelectorAll(sel)]; }
+  function t(key, params) {
+    let s = I18N.bundle[key];
+    if (s === undefined) s = I18N.fallback[key];
+    if (s === undefined) return key;
+    if (params) for (const [k, v] of Object.entries(params)) s = s.replaceAll('{{' + k + '}}', v);
+    return s;
+  }
+  function applyTranslations() {
+    document.documentElement.setAttribute('lang', I18N.current);
+    document.title = t('app.title');
+    for (const el of $$('[data-t]')) el.textContent = t(el.dataset.t);
+    // re-render anything dynamic that is currently visible
+    if (typeof renderWleds === 'function' && state.wleds.length) renderWleds();
+    if (typeof rebuildLangPicker === 'function') rebuildLangPicker();
+  }
+  async function loadLocale(lang) {
+    const res = await fetch(`/locales/${lang}.json`, { cache: 'no-cache' });
+    if (!res.ok) throw new Error(`locale ${lang} HTTP ${res.status}`);
+    return res.json();
+  }
+  function pickLang() {
+    const stored = localStorage.getItem('wledgame.lang');
+    if (stored && I18N.supported.includes(stored)) return stored;
+    if (I18N.supported.includes(I18N.serverDefault)) return I18N.serverDefault;
+    const nav = (navigator.language || 'en').slice(0, 2).toLowerCase();
+    if (I18N.supported.includes(nav)) return nav;
+    return 'en';
+  }
+  async function setLang(lang, persist = true) {
+    if (!I18N.supported.includes(lang)) lang = 'en';
+    I18N.current = lang;
+    I18N.bundle = await loadLocale(lang);
+    if (persist) localStorage.setItem('wledgame.lang', lang);
+    applyTranslations();
+  }
+  async function initI18n() {
+    // Always load English first (fallback bundle).
+    try { I18N.fallback = await loadLocale('en'); I18N.bundle = I18N.fallback; }
+    catch (_) { /* page text data-t fallback still applies */ }
+    // Pull server defaults; failure is non-fatal.
+    try {
+      const cfg = await (await fetch('/api/config')).json();
+      if (Array.isArray(cfg.supportedLangs)) I18N.supported = cfg.supportedLangs;
+      if (typeof cfg.defaultLang === 'string')  I18N.serverDefault = cfg.defaultLang;
+    } catch (_) { I18N.supported = ['en', 'pt', 'fr']; }
+    await setLang(pickLang(), /*persist=*/false);
+  }
+  function rebuildLangPicker() {
+    const el = $('#lang-picker');
+    if (!el) return;
+    el.replaceChildren();
+    for (const code of I18N.supported) {
+      const b = document.createElement('button');
+      b.textContent = code.toUpperCase();
+      if (code === I18N.current) b.classList.add('selected');
+      b.addEventListener('click', () => {
+        for (const x of el.children) x.classList.remove('selected');
+        b.classList.add('selected');
+        setLang(code, true);
+      });
+      el.appendChild(b);
+    }
+  }
+
   const SWATCHES = ['#ffd29e','#1a3a8c','#8c1a1a','#ff9a1a','#1a8c8c','#a020a0','#5020a0','#444444'];
 
   const state = {
@@ -170,8 +249,6 @@
     if (saved && saved.mode) state.background = saved;
   } catch (_) {}
 
-  function $(sel) { return document.querySelector(sel); }
-  function $$(sel) { return [...document.querySelectorAll(sel)]; }
   function show(id) {
     $$('.screen').forEach(s => s.classList.remove('active'));
     $('#' + id).classList.add('active');
@@ -272,11 +349,12 @@
   $('#again-btn').addEventListener('click', () => {
     const wait = state.cooldownEndTs - Date.now();
     if (wait > 0) {
-      $('#again-btn').disabled = true;
-      $('#again-btn').textContent = `Aguarda ${Math.ceil(wait/1000)}s…`;
+      const btn = $('#again-btn');
+      btn.disabled = true;
+      btn.textContent = t('over.cooldown', { seconds: Math.ceil(wait/1000) });
       setTimeout(() => {
-        $('#again-btn').disabled = false;
-        $('#again-btn').textContent = 'Jogar outra vez';
+        btn.disabled = false;
+        btn.textContent = t('over.again');
         show('screen-start');
       }, wait);
     } else {
@@ -291,7 +369,8 @@
       const o = document.createElement('option');
       o.value = w.id;
       const ledLabel = (w.ledCount == null) ? '?' : String(w.ledCount);
-      o.textContent = `${w.name} (${ledLabel} LEDs)${w.online ? '' : ' — offline'}`;
+      const offline = w.online ? '' : ` — ${t('wled.offline')}`;
+      o.textContent = `${w.name} (${ledLabel} ${t('wled.ledsSuffix')})${offline}`;
       o.disabled = !w.online;
       sel.appendChild(o);
     }
@@ -325,19 +404,31 @@
     setTimeout(connect, delay);
   }
 
+  // The HUD badge stays as a compact ID (L1, BOSS 1, ∞) regardless of language —
+  // small space + numbers/IDs are universal. The full localized name shows in the overlay.
   function setLevelBadge(level) {
     const el = $('#level-badge');
     el.classList.remove('boss', 'endless');
     if (!level) { el.textContent = '—'; return; }
     if (level.isEndless) { el.textContent = '∞'; el.classList.add('endless'); return; }
     if (level.isBoss) {
-      // B1 → "BOSS 1"
       const n = level.id.replace(/^B/, '');
       el.textContent = 'BOSS ' + n;
       el.classList.add('boss');
       return;
     }
     el.textContent = level.id; // L1, L2, …
+  }
+
+  // Map a Level snapshot/event to the localized display name shown in overlays.
+  function localizedLevelName(level) {
+    if (level.isEndless) return t('level.endless');
+    if (level.isBoss) {
+      const key = 'level.boss' + level.id.replace(/^B/, '');
+      return t(key);
+    }
+    const n = Number(level.id.replace(/^L/, '')) || 1;
+    return t('level.regular', { n });
   }
 
   function showOverlay(text, kind) {
@@ -374,11 +465,11 @@
       case 'levelStart': {
         setLevelBadge(m.level);
         if (m.level.isBoss) {
-          showOverlay(m.level.displayName.toUpperCase(), 'boss');
+          showOverlay(localizedLevelName(m.level).toUpperCase(), 'boss');
         } else if (m.level.isEndless) {
-          showOverlay('ENDLESS MODE', 'endless');
+          showOverlay(t('overlay.endlessMode'), 'endless');
         } else {
-          showOverlay(m.level.displayName.toUpperCase(), null);
+          showOverlay(localizedLevelName(m.level).toUpperCase(), null);
         }
         if (!m.level.isBoss) hideHpBar();
         break;
@@ -391,12 +482,12 @@
       }
       case 'bossDefeated': {
         hideHpBar();
-        showOverlay('BOSS DOWN', 'victory');
+        showOverlay(t('overlay.bossDown'), 'victory');
         navigator.vibrate?.([60, 30, 60, 30, 100]);
         break;
       }
       case 'campaignComplete': {
-        showOverlay('VICTORY', 'victory');
+        showOverlay(t('overlay.victory'), 'victory');
         break;
       }
       case 'hit': {
@@ -413,14 +504,14 @@
       case 'gameOver':
         state.cooldownEndTs = Date.now() + (m.cooldownMs || 5000);
         $('#final-score').textContent = m.score;
-        $('#screen-over h1').textContent = m.victory ? 'VICTORY!' : 'GAME OVER';
+        $('#over-title').textContent = m.victory ? t('over.title.victory') : t('over.title.gameOver');
         show('screen-over');
         break;
       case 'error':
         if (m.reason === 'cooldown') {
           state.cooldownEndTs = Date.now() + (m.retryInMs || 0);
         } else if (m.reason === 'wled_unreachable') {
-          alert('WLED unreachable.');
+          alert(t('err.wledUnreachable'));
         }
         break;
       case 'pong': break;
@@ -464,7 +555,7 @@
     b.classList.toggle('selected', (b.dataset.w === 'true') === state.wEnemies);
   });
 
-  connect();
+  initI18n().finally(connect);
   </script>
 </body>
 </html>

@@ -11,7 +11,7 @@ const TYPES = {
   '.json': 'application/json; charset=utf-8',
 };
 
-export function createHttpHandler({ publicDir, getApiState, getApiWleds, onClientHit }) {
+export function createHttpHandler({ publicDir, getApiState, getApiWleds, getApiConfig, onClientHit }) {
   return function handler(req, res) {
     if (req.method !== 'GET') { res.statusCode = 405; res.end(); return; }
     const url = req.url || '/';
@@ -25,6 +25,11 @@ export function createHttpHandler({ publicDir, getApiState, getApiWleds, onClien
       onClientHit?.();
       res.setHeader('content-type', TYPES['.json']);
       res.end(JSON.stringify(getApiWleds()));
+      return;
+    }
+    if (url === '/api/config') {
+      res.setHeader('content-type', TYPES['.json']);
+      res.end(JSON.stringify(getApiConfig?.() ?? {}));
       return;
     }
     if (url === '/' || url === '/index.html') onClientHit?.();

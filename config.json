@@ -2,6 +2,7 @@
   "httpPort": 8080,
   "httpPortMaxWalk": 8090,
   "logLevel": "info",
+  "defaultLang": "en",
   "fireZoneLeds": 4,
   "targetFps": 30,
   "stateDir": "/var/lib/wledgame",
