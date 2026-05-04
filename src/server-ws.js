@@ -20,7 +20,9 @@ export function createWsLayer({ httpServer, runner, wledStore }) {
       wleds: wledStore.list().map(w => ({
         id: w.id, name: w.name || w.host, host: w.host,
         ledCount: w.ledCount, online: w.online,
+        tunnels: (w.tunnels || []).map(t => ({ startLed: t.startLed, endLed: t.endLed, color: t.color, brightness: t.brightness })),
       })),
+      bests: runner.bests?.() ?? [],
     };
   }
 

@@ -23,6 +23,9 @@
   "start.opt.breathe":   "Breathe",
 
   "start.button":        "START",
+  "start.best":          "Best",
+  "start.bestNone":      "no record yet",
+  "start.bestNew":       "new best!",
 
   "wled.ledsSuffix":     "LEDs",
   "wled.offline":        "offline",

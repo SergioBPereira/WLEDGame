@@ -71,6 +71,47 @@ export function renderFireZone(frame, ledCount, fireZoneLeds, t) {
   }
 }
 
+// Subtle high-water-mark of how far any enemy got this round.
+// Renders as a tiny dim cool-white tick so it doesn't compete with live entities.
+export function renderHighWaterMark(frame, virtualPos, ledCount, fireZoneLeds) {
+  if (virtualPos == null || virtualPos <= 0) return;
+  const lastNonFire = ledCount - fireZoneLeds;
+  const physF = virtualPos * ledCount / 1000;
+  const i = Math.min(lastNonFire - 1, Math.max(0, Math.floor(physF)));
+  // Cool dim white — additive so it shows on dark and tints on top of background.
+  const r = 28, g = 36, b = 50;
+  frame[i*3 + 0] = Math.min(255, frame[i*3 + 0] + r);
+  frame[i*3 + 1] = Math.min(255, frame[i*3 + 1] + g);
+  frame[i*3 + 2] = Math.min(255, frame[i*3 + 2] + b);
+}
+
+// Tunnels: per-WLED occlusion regions configured in wleds.json.
+// Each tunnel paints a fixed dim color over its LEDs and is rendered AFTER
+// entities so it covers them visually (entities still exist + collide).
+export function renderTunnels(frame, tunnels, ledCount, fireZoneLeds) {
+  if (!tunnels || tunnels.length === 0) return;
+  const lastNonFire = ledCount - fireZoneLeds;
+  for (const t of tunnels) {
+    const start = Math.max(0, t.startLed);
+    const end   = Math.min(lastNonFire - 1, t.endLed); // never overlap fire zone
+    const [r, g, b] = t._rgb; // pre-parsed
+    const mul = t.brightness ?? 0.10;
+    for (let i = start; i <= end; i++) {
+      frame[i*3 + 0] = Math.floor(r * mul);
+      frame[i*3 + 1] = Math.floor(g * mul);
+      frame[i*3 + 2] = Math.floor(b * mul);
+    }
+  }
+}
+
+export function isInTunnel(virtualPos, tunnels, ledCount) {
+  if (!tunnels || tunnels.length === 0) return false;
+  const physF = virtualPos * ledCount / 1000;
+  const i = Math.floor(physF);
+  for (const t of tunnels) if (i >= t.startLed && i <= t.endLed) return true;
+  return false;
+}
+
 export function applyBrightness(frame, value0to100) {
   const k = value0to100 / 100;
   for (let i = 0; i < frame.length; i++) {
@@ -78,14 +119,20 @@ export function applyBrightness(frame, value0to100) {
   }
 }
 
-export function renderFrame({ ledCount, t, background, entities, leadId, brightness, cfg }) {
+export function renderFrame({ ledCount, t, background, entities, leadId, brightness, cfg, deepestPos, tunnels }) {
   const frame = newFrame(ledCount);
   const fireZoneLeds = cfg.fireZoneLeds;
   renderBackground(frame, background, ledCount, fireZoneLeds, t, cfg.render);
+  renderHighWaterMark(frame, deepestPos, ledCount, fireZoneLeds);
   renderFireZone(frame, ledCount, fireZoneLeds, t);
   for (const e of entities) {
-    renderEntity(frame, e.pos, e.rgb, ledCount, e.id === leadId, t, cfg.render);
+    // Suppress lead emphasis when the lead is hiding inside a tunnel.
+    const isLead = e.id === leadId && !isInTunnel(e.pos, tunnels, ledCount);
+    renderEntity(frame, e.pos, e.rgb, ledCount, isLead, t, cfg.render);
   }
+  // Tunnels paint LAST over the entity layer so occluded entities are masked
+  // by the tunnel's fixed color (per spec: "not drawn — but they still exist").
+  renderTunnels(frame, tunnels, ledCount, fireZoneLeds);
   applyBrightness(frame, brightness);
   return frame;
 }

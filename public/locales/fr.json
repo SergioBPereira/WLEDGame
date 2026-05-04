@@ -23,6 +23,9 @@
   "start.opt.breathe":   "Respiration",
 
   "start.button":        "COMMENCER",
+  "start.best":          "Record",
+  "start.bestNone":      "aucun record",
+  "start.bestNew":       "nouveau record !",
 
   "wled.ledsSuffix":     "LEDs",
   "wled.offline":        "hors ligne",

@@ -47,7 +47,14 @@ export function createGameState({ ledCount, fireZoneLeds }) {
     fireZoneVirtualSize: 1000 * fireZoneLeds / ledCount,
     nextId: makeIdGen(),
     overUntilTs: 0,
+    deepestPos: 0, // virtual coord, [0..1000] — high-water-mark for the round
   };
+}
+
+// Update the round's HWM from the current cluster set.
+// Call after each advance/spawn cycle.
+export function updateDeepestPos(gs) {
+  for (const c of gs.clusters) if (c.pos > gs.deepestPos) gs.deepestPos = c.pos;
 }
 
 export function spawnEnemy(gs, color) {
@@ -172,6 +179,7 @@ export function startRound(gs, opts) {
   gs.score = 0;
   gs.clusters = [];
   gs.shots = [];
+  gs.deepestPos = 0;
   gs.wrongColorMode = opts.wrongColorMode;
   gs.kidsMode = !!opts.kidsMode;
   gs.wEnemies = !!opts.wEnemies;

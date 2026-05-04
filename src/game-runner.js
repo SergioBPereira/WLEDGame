@@ -1,10 +1,11 @@
 import {
   createGameState, startRound, gameOver, checkGameOver, advanceEntities,
   spawnEnemy, spawnBoss, resolveCollisions, renderEntities, leadEntityId,
-  spawnInterval, enemySpeed, applyKidsMode,
+  spawnInterval, enemySpeed, applyKidsMode, updateDeepestPos,
 } from './game.js';
 import { renderFrame } from './render.js';
 import { createLevelManager, findLevelIdx } from './levels.js';
+import { loadHighscores, saveHighscores, recordScore, getBest, setupKey } from './highscores.js';
 import { log } from './log.js';
 
 const COLORS = ['R', 'G', 'B'];
@@ -20,6 +21,7 @@ export function createGameRunner({ cfg, wledStore, sender, broadcast, broadcastF
   let logTimer = null;
   let frameCount = 0;
   let lastFpsLog = 0;
+  let highscores = loadHighscores(cfg.stateDir);
 
   function reset(ledCount) {
     gs = createGameState({ ledCount, fireZoneLeds: cfg.fireZoneLeds });
@@ -153,6 +155,8 @@ export function createGameRunner({ cfg, wledStore, sender, broadcast, broadcastF
         ledCount: gs.ledCount, t: (now - gs.startedAt) / 1000,
         background: gs.background, entities: flat,
         leadId: leadEntityId(gs), brightness: gs.brightness, cfg,
+        deepestPos: gs.deepestPos,
+        tunnels: activeWled?.tunnels,
       });
       if (activeWled) {
         sender.sendFrame({ host: activeWled.host, udpPort: activeWled.udpPort }, frame).catch(err => {
@@ -184,6 +188,7 @@ export function createGameRunner({ cfg, wledStore, sender, broadcast, broadcastF
     }
 
     advanceEntities(gs, dtSec, speed, cfg.game.shotSpeedUnitsPerSec);
+    updateDeepestPos(gs);
 
     const events = resolveCollisions(gs, gs.wrongColorMode, now);
     for (const e of events) broadcast(e);
@@ -191,7 +196,12 @@ export function createGameRunner({ cfg, wledStore, sender, broadcast, broadcastF
 
     if (checkGameOver(gs)) {
       gameOver(gs, cfg.game.gameOverCooldownMs);
-      broadcast({ type: 'gameOver', score: gs.score, cooldownMs: cfg.game.gameOverCooldownMs, levelReached: lv.id });
+      const hs = recordRoundScore(gs);
+      broadcast({
+        type: 'gameOver', score: gs.score,
+        cooldownMs: cfg.game.gameOverCooldownMs, levelReached: lv.id,
+        newBest: hs.changed, prevBest: hs.prev, best: hs.current,
+      });
       broadcast(stateMessage());
       try { await wledStore.restoreStateFor(activeWled.id); } catch (e) {
         log.warn('restore failed', { error: String(e.message || e) });
@@ -211,7 +221,12 @@ export function createGameRunner({ cfg, wledStore, sender, broadcast, broadcastF
         broadcast({ type: 'campaignComplete', score: gs.score });
         // Transition to "over" — campaign clear is a victory condition, no game-over flash.
         gameOver(gs, cfg.game.gameOverCooldownMs);
-        broadcast({ type: 'gameOver', score: gs.score, cooldownMs: cfg.game.gameOverCooldownMs, victory: true, levelReached: lv.id });
+        const hs = recordRoundScore(gs);
+        broadcast({
+          type: 'gameOver', score: gs.score,
+          cooldownMs: cfg.game.gameOverCooldownMs, victory: true, levelReached: lv.id,
+          newBest: hs.changed, prevBest: hs.prev, best: hs.current,
+        });
         broadcast(stateMessage());
         try { await wledStore.restoreStateFor(activeWled.id); } catch (_) {}
         activeWled = null;
@@ -231,6 +246,8 @@ export function createGameRunner({ cfg, wledStore, sender, broadcast, broadcastF
       leadId,
       brightness: gs.brightness,
       cfg,
+      deepestPos: gs.deepestPos,
+      tunnels: activeWled?.tunnels,
     });
     if (activeWled) {
       sender.sendFrame({ host: activeWled.host, udpPort: activeWled.udpPort }, frame).catch(err => {
@@ -238,6 +255,26 @@ export function createGameRunner({ cfg, wledStore, sender, broadcast, broadcastF
       });
     }
     broadcastFrame(frame);
+  }
+
+  function recordRoundScore(gs) {
+    const key = setupKey({
+      wledId: gs.wledId, wrongColorMode: gs.wrongColorMode,
+      kidsMode: gs.kidsMode, wEnemies: gs.wEnemies, endless: gs.endless,
+    });
+    const result = recordScore(highscores, key, gs.score);
+    if (result.changed) {
+      saveHighscores(cfg.stateDir, highscores).catch?.(e =>
+        log.warn('save highscores failed', { error: String(e.message || e) }));
+      log.info('new best', { key, score: gs.score });
+    }
+    return result;
+  }
+
+  function bestsSnapshot() {
+    // Return a flat list of all known bests so the start screen can display the
+    // one matching the user's current setup without polling per change.
+    return Object.entries(highscores.entries).map(([key, v]) => ({ key, ...v }));
   }
 
   function stateMessage() {
@@ -259,6 +296,7 @@ export function createGameRunner({ cfg, wledStore, sender, broadcast, broadcastF
   }
 
   function snapshot() { return stateMessage(); }
+  function bests()    { return bestsSnapshot(); }
 
   async function shutdown() {
     if (loopTimer) clearInterval(loopTimer);
@@ -268,5 +306,5 @@ export function createGameRunner({ cfg, wledStore, sender, broadcast, broadcastF
     }
   }
 
-  return { start, shoot, setBrightness, snapshot, shutdown };
+  return { start, shoot, setBrightness, snapshot, bests, shutdown };
 }

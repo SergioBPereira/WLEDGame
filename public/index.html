@@ -427,6 +427,30 @@
       box-shadow: 0 0 0 1px rgba(92,220,255,0.4) inset;
     }
 
+    /* ────────── Best score display on start screen ────────── */
+    .best {
+      display: flex; align-items: center; justify-content: space-between;
+      gap: 10px; padding: 10px 14px; border-radius: 12px;
+      background: linear-gradient(180deg, rgba(255,174,59,0.08), rgba(255,174,59,0.02));
+      border: 1px solid rgba(255,174,59,0.3);
+      box-shadow: 0 0 18px -8px rgba(255,174,59,0.5);
+    }
+    .best .best-label {
+      font-family: var(--font-display); font-weight: 700;
+      font-size: 0.72rem; letter-spacing: 0.16em; text-transform: uppercase;
+      color: var(--boss);
+    }
+    .best .best-score {
+      font-family: var(--font-mono); font-weight: 800;
+      font-variant-numeric: tabular-nums;
+      font-size: 1.4rem; color: var(--text);
+    }
+    .best .best-age {
+      font-size: 0.78rem; color: var(--muted);
+    }
+    .best.empty .best-score { color: var(--dim); font-size: 0.95rem; font-family: var(--font-body); font-weight: 400; }
+    .best.empty .best-age { display: none; }
+
     /* ────────── Reduced motion ────────── */
     @media (prefers-reduced-motion: reduce) {
       .start-btn::after { transition: none; }
@@ -495,6 +519,12 @@
           <button data-preview="false" class="selected" data-t="start.opt.off">Off</button>
           <button data-preview="true" data-t="start.opt.on">On</button>
         </div></div>
+    </div>
+
+    <div class="best empty" id="best-row" aria-live="polite">
+      <span class="best-label" data-t="start.best">Best</span>
+      <span class="best-score" id="best-score">—</span>
+      <span class="best-age" id="best-age"></span>
     </div>
 
     <button id="start-btn" class="start-btn" data-t="start.button">START</button>
@@ -624,6 +654,7 @@
     brightness: Number(localStorage.getItem('wledgame.brightness') || 70),
     preview: localStorage.getItem('wledgame.preview') === 'true',
     cooldownEndTs: 0,
+    bests: {},  // map<setupKey, { score, ts }>
     ws: null, reconnectAttempt: 0,
   };
 
@@ -647,14 +678,16 @@
     });
   }
 
-  bindPicker('.picker [data-mode]', b => state.wrongColorMode = b.dataset.mode);
-  bindPicker('.picker [data-kids]', b => state.kidsMode = b.dataset.kids === 'true');
+  bindPicker('.picker [data-mode]', b => { state.wrongColorMode = b.dataset.mode; refreshBest(); });
+  bindPicker('.picker [data-kids]', b => { state.kidsMode = b.dataset.kids === 'true'; refreshBest(); });
   bindPicker('.picker [data-w]', b => {
     state.wEnemies = b.dataset.w === 'true';
     localStorage.setItem('wledgame.wEnemies', String(state.wEnemies));
+    refreshBest();
   });
   bindPicker('.picker [data-endless]', b => {
     state.endless = b.dataset.endless === 'true';
+    refreshBest();
   });
   bindPicker('.picker [data-bg]', b => {
     state.background.mode = b.dataset.bg;
@@ -761,7 +794,49 @@
     state.wledId = firstOnline ? firstOnline.id : (state.wleds[0]?.id ?? null);
     if (state.wledId) sel.value = state.wledId;
     $('#start-btn').disabled = !firstOnline;
-    sel.addEventListener('change', () => state.wledId = sel.value);
+    sel.addEventListener('change', () => { state.wledId = sel.value; refreshBest(); });
+    refreshBest();
+  }
+
+  // Mirror src/highscores.js setupKey() — keep field order in sync.
+  function currentSetupKey() {
+    if (!state.wledId) return null;
+    return [
+      state.wledId,
+      state.wrongColorMode,
+      state.kidsMode ? 'kids' : 'std',
+      state.wEnemies ? 'wEn' : 'wOff',
+      state.endless ? 'endless' : 'campaign',
+    ].join('|');
+  }
+  function relativeAge(tsMs) {
+    const diffSec = Math.max(0, Math.floor((Date.now() - tsMs) / 1000));
+    const lang = I18N.current || 'en';
+    let rtf;
+    try { rtf = new Intl.RelativeTimeFormat(lang, { numeric: 'auto', style: 'short' }); }
+    catch { rtf = new Intl.RelativeTimeFormat('en', { numeric: 'auto', style: 'short' }); }
+    if (diffSec < 60)       return rtf.format(-diffSec, 'second');
+    if (diffSec < 3600)     return rtf.format(-Math.floor(diffSec / 60), 'minute');
+    if (diffSec < 86400)    return rtf.format(-Math.floor(diffSec / 3600), 'hour');
+    if (diffSec < 86400*30) return rtf.format(-Math.floor(diffSec / 86400), 'day');
+    if (diffSec < 86400*365)return rtf.format(-Math.floor(diffSec / (86400*30)), 'month');
+    return rtf.format(-Math.floor(diffSec / (86400*365)), 'year');
+  }
+  function refreshBest() {
+    const row = $('#best-row');
+    const scoreEl = $('#best-score');
+    const ageEl = $('#best-age');
+    const key = currentSetupKey();
+    const best = key ? state.bests[key] : null;
+    if (!best) {
+      row.classList.add('empty');
+      scoreEl.textContent = t('start.bestNone');
+      ageEl.textContent = '';
+    } else {
+      row.classList.remove('empty');
+      scoreEl.textContent = String(best.score);
+      ageEl.textContent = relativeAge(best.ts);
+    }
   }
 
   function send(obj) {
@@ -834,7 +909,13 @@
   function onMessage(m) {
     switch (m.type) {
       case 'hello':
-        state.wleds = m.wleds; renderWleds(); break;
+        state.wleds = m.wleds;
+        if (Array.isArray(m.bests)) {
+          state.bests = {};
+          for (const b of m.bests) state.bests[b.key] = { score: b.score, ts: b.ts };
+        }
+        renderWleds();
+        break;
       case 'state':
         $('#score').textContent = m.score;
         if (m.level) setLevelBadge(m.level);
@@ -889,6 +970,10 @@
         $('#final-score').textContent = m.score;
         $('#over-title').textContent = m.victory ? t('over.title.victory') : t('over.title.gameOver');
         $('#screen-over').classList.toggle('victory', !!m.victory);
+        if (m.newBest && m.best) {
+          const key = currentSetupKey();
+          if (key) state.bests[key] = { score: m.best.score, ts: m.best.ts };
+        }
         show('screen-over');
         break;
       case 'error':
