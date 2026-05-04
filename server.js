@@ -35,10 +35,12 @@ async function main() {
     getApiWleds: () => wledStore.list().map(w => ({
       id: w.id, name: w.name || w.host, host: w.host, ledCount: w.ledCount, online: w.online,
     })),
+    onClientHit: () => { wledStore.maybeReprobe().catch(() => {}); },
   });
   const httpServer = http.createServer(handler);
 
   wsLayer = createWsLayer({ httpServer, runner, wledStore });
+  wledStore.setOnChange(() => wsLayer?.broadcastHello());
 
   const port = await listenWalking(httpServer, cfg.httpPort, cfg.httpPortMaxWalk);
   log.info('http+ws listening', { port });
