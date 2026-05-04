@@ -58,9 +58,18 @@
         text-shadow: 0 0 18px currentColor; color: #cdf; }
     .overlay.boss .ot { color: #fb8; }
     .overlay.victory .ot { color: #afa; }
+    .lang-corner { position: fixed; top: 8px; right: 8px; z-index: 50;
+        display: flex; gap: 4px; padding: 4px;
+        background: rgba(20,20,30,0.65); border: 1px solid #334; border-radius: 999px;
+        backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
+    .lang-corner button { flex: 0 0 auto; padding: 4px 10px; font-size: 0.78rem; border-radius: 999px;
+        background: transparent; color: #aab; letter-spacing: 0.05em; }
+    .lang-corner button.selected { background: #335; color: #fff; outline: none; }
   </style>
 </head>
 <body>
+
+  <div class="lang-corner" id="lang-picker" aria-label="Language"></div>
 
   <div id="screen-start" class="screen active">
     <h1 data-t="app.title">WLED Game</h1>
@@ -111,9 +120,6 @@
         <button data-preview="false" class="selected" data-t="start.opt.off">Off</button>
         <button data-preview="true" data-t="start.opt.on">On</button>
       </div></div>
-
-    <div class="row"><label style="flex:0 0 6em" data-t="start.label.lang">Language</label>
-      <div class="picker" id="lang-picker" style="flex:1"></div></div>
 
     <div style="flex:1"></div>
     <button id="start-btn" class="start-btn" data-t="start.button">START</button>
