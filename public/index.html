@@ -44,6 +44,20 @@
     .swatch.selected { border-color: #fff; }
     .over h1 { font-size: 3rem; }
     .over .score-big { font-size: 4rem; font-weight: 700; }
+    .level-badge { font-size: 0.9rem; padding: 4px 10px; border-radius: 999px;
+        background: #224; color: #cdf; letter-spacing: 0.05em; min-width: 3em; text-align: center;
+        border: 1px solid #446; }
+    .level-badge.boss { background: #621; color: #fb8; border-color: #a52; }
+    .level-badge.endless { background: #303; color: #f8c; border-color: #707; }
+    .hp-bar { height: 6px; background: #222; border-radius: 999px; overflow: hidden; margin-top: 4px; display: none; }
+    .hp-bar > i { display: block; height: 100%; background: linear-gradient(90deg, #f44, #fa4); transition: width 120ms; }
+    .overlay { position: absolute; left: 0; right: 0; top: 30%; text-align: center; pointer-events: none;
+        opacity: 0; transition: opacity 200ms; }
+    .overlay.show { opacity: 1; }
+    .overlay .ot { font-size: 2.4rem; font-weight: 800; letter-spacing: 0.05em;
+        text-shadow: 0 0 18px currentColor; color: #cdf; }
+    .overlay.boss .ot { color: #fb8; }
+    .overlay.victory .ot { color: #afa; }
   </style>
 </head>
 <body>
@@ -73,6 +87,12 @@
         <button data-w="true">On</button>
       </div></div>
 
+    <div class="row" id="endless-row" style="display:none"><label style="flex:0 0 6em">Endless</label>
+      <div class="picker" style="flex:1">
+        <button data-endless="false" class="selected">Campaign</button>
+        <button data-endless="true">Endless mode</button>
+      </div></div>
+
     <div>
       <div class="row"><label style="flex:0 0 6em">Background</label>
         <div class="picker" style="flex:1">
@@ -96,9 +116,12 @@
     <button id="start-btn" class="start-btn">COMEÇAR</button>
   </div>
 
-  <div id="screen-game" class="screen">
+  <div id="screen-game" class="screen" style="position: relative;">
     <div class="top">
-      <div class="score" id="score">0</div>
+      <div style="display:flex; flex-direction:column; gap:4px;">
+        <div class="score" id="score">0</div>
+        <div class="level-badge" id="level-badge">L1</div>
+      </div>
       <div class="bri">
         <span style="font-size:0.85rem">☼</span>
         <input id="brightness" type="range" min="10" max="100" value="70">
@@ -106,7 +129,9 @@
       </div>
       <div class="conn" id="conn"></div>
     </div>
+    <div class="hp-bar" id="hp-bar"><i id="hp-fill" style="width: 100%"></i></div>
     <div style="flex:1"></div>
+    <div class="overlay" id="overlay"><div class="ot" id="overlay-text"></div></div>
     <div id="strip-wrap" style="display:none; height: 64px; background: #111; border-radius: 6px; overflow: hidden; box-shadow: inset 0 0 0 1px #333;">
       <canvas id="strip-canvas" style="image-rendering: pixelated; width: 100%; height: 100%; display: block;"></canvas>
     </div>
@@ -132,6 +157,8 @@
     wleds: [], wledId: null,
     wrongColorMode: 'consumed', kidsMode: false,
     wEnemies: localStorage.getItem('wledgame.wEnemies') === 'true',
+    endless: false,
+    endlessUnlocked: false,
     background: { mode: 'off', color: SWATCHES[1] },
     brightness: Number(localStorage.getItem('wledgame.brightness') || 70),
     preview: localStorage.getItem('wledgame.preview') === 'true',
@@ -166,6 +193,9 @@
   bindPicker('.picker [data-w]', b => {
     state.wEnemies = b.dataset.w === 'true';
     localStorage.setItem('wledgame.wEnemies', String(state.wEnemies));
+  });
+  bindPicker('.picker [data-endless]', b => {
+    state.endless = b.dataset.endless === 'true';
   });
   bindPicker('.picker [data-bg]', b => {
     state.background.mode = b.dataset.bg;
@@ -231,11 +261,14 @@
       wrongColorMode: state.wrongColorMode,
       kidsMode: state.kidsMode,
       wEnemies: state.wEnemies,
+      endless: state.endless && state.endlessUnlocked,
       background: state.background.mode === 'off'
         ? { mode: 'off' }
         : { mode: state.background.mode, color: state.background.color },
     });
     show('screen-game');
+    setLevelBadge(null);
+    hideHpBar();
   });
   $('#again-btn').addEventListener('click', () => {
     const wait = state.cooldownEndTs - Date.now();
@@ -293,18 +326,84 @@
     setTimeout(connect, delay);
   }
 
+  function setLevelBadge(level) {
+    const el = $('#level-badge');
+    el.classList.remove('boss', 'endless');
+    if (!level) { el.textContent = '—'; return; }
+    if (level.isEndless) { el.textContent = '∞'; el.classList.add('endless'); return; }
+    if (level.isBoss) {
+      // B1 → "BOSS 1"
+      const n = level.id.replace(/^B/, '');
+      el.textContent = 'BOSS ' + n;
+      el.classList.add('boss');
+      return;
+    }
+    el.textContent = level.id; // L1, L2, …
+  }
+
+  function showOverlay(text, kind) {
+    const ov = $('#overlay');
+    $('#overlay-text').textContent = text;
+    ov.classList.remove('boss', 'victory');
+    if (kind) ov.classList.add(kind);
+    ov.classList.add('show');
+    clearTimeout(showOverlay._t);
+    showOverlay._t = setTimeout(() => ov.classList.remove('show'), 1400);
+  }
+
+  function showHpBar(hp, maxHp) {
+    const bar = $('#hp-bar');
+    bar.style.display = '';
+    $('#hp-fill').style.width = (100 * hp / maxHp).toFixed(1) + '%';
+  }
+  function hideHpBar() { $('#hp-bar').style.display = 'none'; }
+
   function onMessage(m) {
     switch (m.type) {
       case 'hello':
         state.wleds = m.wleds; renderWleds(); break;
       case 'state':
         $('#score').textContent = m.score;
-        if (m.phase === 'playing' && document.querySelector('.screen.active').id !== 'screen-game') {
+        if (m.endlessUnlocked && !state.endlessUnlocked) {
+          state.endlessUnlocked = true;
+          $('#endless-row').style.display = '';
+        }
+        if (m.level) setLevelBadge(m.level);
+        if ((m.phase === 'playing' || m.phase === 'levelTransition')
+            && document.querySelector('.screen.active').id !== 'screen-game') {
           show('screen-game');
         } else if (m.phase === 'idle') {
           show('screen-start');
         }
         break;
+      case 'levelStart': {
+        setLevelBadge(m.level);
+        if (m.level.isBoss) {
+          showOverlay(m.level.displayName.toUpperCase(), 'boss');
+        } else if (m.level.isEndless) {
+          showOverlay('ENDLESS MODE', 'endless');
+        } else {
+          showOverlay(m.level.displayName.toUpperCase(), null);
+        }
+        if (!m.level.isBoss) hideHpBar();
+        break;
+      }
+      case 'bossHit': {
+        showHpBar(m.hp, m.maxHp);
+        $$('.btn-color').forEach(b => { if (b.dataset.color === m.color) flash(b, 'flash'); });
+        navigator.vibrate?.(40);
+        break;
+      }
+      case 'bossDefeated': {
+        hideHpBar();
+        showOverlay('BOSS DOWN', 'victory');
+        navigator.vibrate?.([60, 30, 60, 30, 100]);
+        break;
+      }
+      case 'campaignComplete': {
+        showOverlay('VICTORY', 'victory');
+        break;
+      }
       case 'hit': {
         $$('.btn-color').forEach(b => { if (b.dataset.color === m.color) flash(b, 'flash'); });
         navigator.vibrate?.(30);
@@ -319,6 +418,7 @@
       case 'gameOver':
         state.cooldownEndTs = Date.now() + (m.cooldownMs || 5000);
         $('#final-score').textContent = m.score;
+        $('#screen-over h1').textContent = m.victory ? 'VICTORY!' : 'GAME OVER';
         show('screen-over');
         break;
       case 'error':
@@ -326,6 +426,9 @@
           state.cooldownEndTs = Date.now() + (m.retryInMs || 0);
         } else if (m.reason === 'wled_unreachable') {
           alert('WLED unreachable.');
+        } else if (m.reason === 'endless_locked') {
+          alert('Endless mode locked. Beat the campaign first.');
+          show('screen-start');
         }
         break;
       case 'pong': break;

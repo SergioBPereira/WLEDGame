@@ -87,7 +87,8 @@ test('end-to-end: round produces UDP frames and state broadcasts', async () => {
       background: { mode: 'off' },
     }));
 
-    await new Promise(r => setTimeout(r, 500));
+    // Need to outlast the 1500ms levelTransition phase before the round enters 'playing'.
+    await new Promise(r => setTimeout(r, 2000));
 
     ws.close();
     await runner.shutdown();
